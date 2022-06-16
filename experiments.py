@@ -1,7 +1,7 @@
-from DRSA import *
-from rules_induction import *
-from classification import *
-from helpers import *
+from MedicalDataClassification.DRSA import *
+from MedicalDataClassification.rules_induction import *
+from MedicalDataClassification.classification import *
+from MedicalDataClassification.helpers import *
 from sklearn.metrics import f1_score
 
 # a, p, o = read_dataset(dataset_name)
