@@ -324,3 +324,10 @@ def DOMLEM_VC_DRSA(approx, dataset, l):
     rules_to_stats = {'rule type 1/3': build_rules_to_calculation(rules['rule type 1/3'], criteria)}
     return rules, rules_readable, rules_to_stats
 
+
+def DOMApriori_DRSA():
+    return 0, 0, 0
+
+
+def DOMApriori_VC_DRSA():
+    return 0, 0, 0
