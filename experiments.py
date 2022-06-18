@@ -74,8 +74,8 @@ def find_interesting_labels(labels_candidates, expected_result):
     for lc in labels_candidates:
         tmp[lc] = expected_result.count(lc)
         cnt.append(tmp[lc])
-    if max(cnt)/ len(expected_result) > 0.6:
-        return list(set(labels_candidates)-set(list(tmp.values()).index(max(cnt))))
+    if max(cnt) / len(expected_result) > 0.6:
+        return list(set(labels_candidates)-set([list(tmp.keys())[list(tmp.values()).index(max(cnt))]]))
     else:
         return labels_candidates
 
@@ -88,11 +88,11 @@ def leave_one_out_simple_classification(dataset_name, type, algorithm, l):
     result = []
     if type == "VC-DRSA":
         for f in folds:
-            r, r_r, r_s, _ = run_VC_DRSA(f['train'], algorithm, l)
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
             result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
     else:
         for f in folds:
-            r, r_r, r_s, _ = run_DRSA(f['train'], algorithm)
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
             result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
     expected_result = [f['test'][-1] for f in folds]
     good = []
@@ -132,13 +132,13 @@ def leave_one_out_new_scheme_classification(dataset_name, type, algorithm, l):
         for f in folds:
             downward_union = find_downward_union_of_classes(dataset)
             upward_union = find_upward_union_of_classes(dataset)
-            r, r_r, r_s, d = run_VC_DRSA(f['train'], algorithm, l)
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
             result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
     else:
         for f in folds:
             downward_union = find_downward_union_of_classes(dataset)
             upward_union = find_upward_union_of_classes(dataset)
-            r, r_r, r_s, d = run_DRSA(f['train'], algorithm)
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
             result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
     expected_result = [f['test'][-1] for f in folds]
     good = []
@@ -232,7 +232,6 @@ def find_best_model(dataset_name, range_, new_scheme, algorithm):
 
 
 def prepare_report(data):
-
     return 0
 
 
@@ -244,7 +243,7 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
             (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, 1.0)
         elif classification_algorithm == 'new':
             (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, 1.0)
-        r, r_r, r_s, d = run_DRSA(dataset, induction_algorithm)
+        (r, r_r, r_s), d = run_DRSA(dataset, induction_algorithm)
     elif type == 'VC-DRSA':
         range_ = [0.05 * i for i in range(1, 20)]
         if classification_algorithm == 'old':
@@ -261,7 +260,7 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
             else:
                 l = b[0]
             (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, l)
-        r, r_r, r_s, d = run_VC_DRSA(dataset, induction_algorithm, l)
+        (r, r_r, r_s), d = run_VC_DRSA(dataset, induction_algorithm, l)
     data = {
         'zbiór': dataset,
         'uruchomienie': {'wersja algorytmu': type, 'algorytm indukcji reguł': induction_algorithm, 'algorytm klasyfikacji': classification_algorithm},
@@ -300,7 +299,7 @@ def run_experiment_full():
         print("Done")
 
 
-
+run_experiment_full()
 
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
 # run_VC_DRSA('data\exampleStef.isf', 0.8)
