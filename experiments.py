@@ -231,7 +231,78 @@ def find_best_model(dataset_name, range_, new_scheme, algorithm):
     return best, best_scores
 
 
+def leave_one_out_old_full(dataset_name, type, algorithm, l):
+    a, p, o = read_dataset(dataset_name)
+    dataset = prepare_dataset(a, p, o)
+    classes = find_all_possible_decision_classes(dataset)
+    folds = [{'train': {"attributes": dataset['attributes'], "objects": [o1 for o1 in dataset['objects'] if o1 != o]},
+              'test': o} for o in dataset['objects']]
+    result = []
+    if type == "VC-DRSA":
+        for f in folds:
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
+            result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
+    else:
+        for f in folds:
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
+            result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
+    return result
+
+
+def leave_one_out_new_full(dataset_name, type, algorithm, l):
+    a, p, o = read_dataset(dataset_name)
+    dataset = prepare_dataset(a, p, o)
+    classes = find_all_possible_decision_classes(dataset)
+    folds = [{'train': {"attributes": dataset['attributes'], "objects": [o1 for o1 in dataset['objects'] if o1 != o]},
+              'test': o} for o in dataset['objects']]
+    result = []
+    if type == "VC-DRSA":
+        for f in folds:
+            downward_union = find_downward_union_of_classes(dataset)
+            upward_union = find_upward_union_of_classes(dataset)
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
+            result.append(
+                classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[
+                    0])
+    else:
+        for f in folds:
+            downward_union = find_downward_union_of_classes(dataset)
+            upward_union = find_upward_union_of_classes(dataset)
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
+            result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
+    return result
+
+
+def calculate_rules_stats(rules, approx, size):
+    stats = {}
+    cnt = 1
+    for rule in rules:
+        if rule['class'][6] == '>':
+            val = len(approx["lower_approx_downward_union"][int(rule['class'][10])-1]['objects'])
+        elif rule['class'][6] == '<':
+            val = len(approx["lower_approx_upward_union"][int(rule['class'][10])-1]['objects'])
+        stats[cnt] = {'support': len(rule['covered']),
+                      'strength': len(rule['covered'])/size,
+                      'coverage': len(rule['covered'])/val}
+        cnt += 1
+    return stats
+
+
 def prepare_report(data):
+    """
+    data = {
+        'zbiór': dataset,
+        'uruchomienie': {'wersja algorytmu': type, 'algorytm indukcji reguł': induction_algorithm,
+                         'algorytm klasyfikacji': classification_algorithm},
+        'unie': d['unie'],
+        'dominacja': d['dominacja'],
+        'przybliżenia': d['approx'],
+        'statystyki_przybliżeń': d['stats'],
+        'reguły': r_r,
+        'statystyki_reguł': calculate_rules_stats(r_s['rule type 1/3'], d['approx'], len(dataset['objects'])),
+        'walidacja_krzyżowa': (accuracy, not_classified, correct, f1_score),
+        'walidacja_krzyżowa_szczegóły': details
+    }"""
     return 0
 
 
@@ -241,8 +312,10 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
     if type == 'DRSA':
         if classification_algorithm == 'old':
             (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, 1.0)
+            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, l)
         elif classification_algorithm == 'new':
             (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, 1.0)
+            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, l)
         (r, r_r, r_s), d = run_DRSA(dataset, induction_algorithm)
     elif type == 'VC-DRSA':
         range_ = [0.05 * i for i in range(1, 20)]
@@ -253,6 +326,7 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
             else:
                 l = b[0]
             (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, l)
+            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, l)
         elif classification_algorithm == 'new':
             b, _ = find_best_model(dataset_name, range_, True, induction_algorithm)
             if len(b) > 1:
@@ -260,6 +334,7 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
             else:
                 l = b[0]
             (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, l)
+            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, l)
         (r, r_r, r_s), d = run_VC_DRSA(dataset, induction_algorithm, l)
     data = {
         'zbiór': dataset,
@@ -269,9 +344,9 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
         'przybliżenia': d['approx'],
         'statystyki_przybliżeń': d['stats'],
         'reguły': r_r,
-        'statystyki_reguł': [],
+        'statystyki_reguł': calculate_rules_stats(r_s['rule type 1/3'], d['approx'], len(dataset['objects'])),
         'walidacja_krzyżowa': (accuracy, not_classified, correct, f1_score),
-        'walidacja_krzyżowa_szczegóły': []
+        'walidacja_krzyżowa_szczegóły': details
     }
     prepare_report(data)
 
