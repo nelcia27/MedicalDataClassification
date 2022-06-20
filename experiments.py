@@ -3,6 +3,7 @@ from MedicalDataClassification.rules_induction import *
 from MedicalDataClassification.classification import *
 from MedicalDataClassification.helpers import *
 from sklearn.metrics import f1_score
+import pandas as pd
 
 
 def run_DRSA(dataset, algorithm):
@@ -228,6 +229,7 @@ def find_best_model(dataset_name, range_, new_scheme, algorithm):
                             best = []
                             best.append(l)
                             best_scores = (accuracy, not_classified, correct, f1_score)
+    print("ERRORS: ", error_range)
     return best, best_scores
 
 
@@ -246,7 +248,8 @@ def leave_one_out_old_full(dataset_name, type, algorithm, l):
         for f in folds:
             (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
             result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
-    return result
+    expected_result = [o[-1] for o in dataset['objects']]
+    return result, expected_result
 
 
 def leave_one_out_new_full(dataset_name, type, algorithm, l):
@@ -262,15 +265,15 @@ def leave_one_out_new_full(dataset_name, type, algorithm, l):
             upward_union = find_upward_union_of_classes(dataset)
             (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
             result.append(
-                classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[
-                    0])
+                classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
     else:
         for f in folds:
             downward_union = find_downward_union_of_classes(dataset)
             upward_union = find_upward_union_of_classes(dataset)
             (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
             result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
-    return result
+    expected_result = [o[-1] for o in dataset['objects']]
+    return result, expected_result
 
 
 def calculate_rules_stats(rules, approx, size):
@@ -278,44 +281,87 @@ def calculate_rules_stats(rules, approx, size):
     cnt = 1
     for rule in rules:
         if rule['class'][6] == '>':
-            val = len(approx["lower_approx_downward_union"][int(rule['class'][10])-1]['objects'])
+            val = len(approx["lower_approx_downward_union"][int(rule['class'][-1])-1]['objects'])
         elif rule['class'][6] == '<':
-            val = len(approx["lower_approx_upward_union"][int(rule['class'][10])-1]['objects'])
-        stats[cnt] = {'support': len(rule['covered']),
-                      'strength': len(rule['covered'])/size,
-                      'coverage': len(rule['covered'])/val}
+            val = len(approx["lower_approx_upward_union"][int(rule['class'][-1])-2]['objects'])
+        if val != 0:
+            stats[cnt] = {'support': len(rule['covered']),
+                          'strength': len(rule['covered'])/size,
+                          'coverage': len(rule['covered'])/val}
+        else:
+            stats[cnt] = {'support': len(rule['covered']),
+                          'strength': len(rule['covered']) / size,
+                          'coverage': 0}
         cnt += 1
     return stats
 
 
-def prepare_report(data):
-    """
-    data = {
-        'zbiór': dataset,
-        'uruchomienie': {'wersja algorytmu': type, 'algorytm indukcji reguł': induction_algorithm,
-                         'algorytm klasyfikacji': classification_algorithm},
-        'unie': d['unie'],
-        'dominacja': d['dominacja'],
-        'przybliżenia': d['approx'],
-        'statystyki_przybliżeń': d['stats'],
-        'reguły': r_r,
-        'statystyki_reguł': calculate_rules_stats(r_s['rule type 1/3'], d['approx'], len(dataset['objects'])),
-        'walidacja_krzyżowa': (accuracy, not_classified, correct, f1_score),
-        'walidacja_krzyżowa_szczegóły': details
-    }"""
+def prepare_report(data, name, num_class, num_attributes):
+    with pd.ExcelWriter('results\DRSA\File'+name+'.xlsx', engine='xlsxwriter') as writer:
+        workbook = writer.book
+        for s in ['Zbiór', 'Dane uruchomienia', 'Unie w dół', 'Unie w górę', 'Dominujące', 'Zdominowane', 'Przybliżenia unii', 'Reguły', 'Statystyki reguł', 'Walidacja krzyżowa']:
+            worksheet = workbook.add_worksheet(s)
+            writer.sheets[s] = worksheet
+        df = pd.DataFrame(data['zbiór']['attributes'])
+        df.to_excel(writer, sheet_name='Zbiór', index=False)
+        df1 = pd.DataFrame(data['zbiór']['objects'])
+        df1.to_excel(writer, sheet_name='Zbiór', startrow=num_attributes + 1, startcol=0, index=False)
+        param = list(data['uruchomienie'].keys())
+        vals = list(data['uruchomienie'].values())
+        df2 = pd.DataFrame({'parametr':param, 'wartość':vals})
+        df2.to_excel(writer, sheet_name='Dane uruchomienia', index=False)
+        dw_un = [(list(d.keys())[0]) for d in data['unie'][0]]
+        dw_un_ = [d[list(d.keys())[0]][1] for d in data['unie'][0]]
+        up_un = [(list(d.keys())[0]) for d in data['unie'][1]]
+        up_un_ = [d[list(d.keys())[0]][1] for d in data['unie'][1]]
+        df3 = pd.DataFrame({"Unie": dw_un, "Obiekty": dw_un_})
+        df3.to_excel(writer, sheet_name='Unie w dół', index=False)
+        df4 = pd.DataFrame({"Unie": up_un, "Obiekty": up_un_})
+        df4.to_excel(writer, sheet_name='Unie w górę', index=False)
+        df5 = pd.DataFrame(data['dominacja'][0])
+        df5 = df5.drop('objects', 1)
+        df5.to_excel(writer, sheet_name='Dominujące', index=False)
+        df6 = pd.DataFrame(data['dominacja'][1])
+        df6 = df6.drop('objects', 1)
+        df6.to_excel(writer, sheet_name='Zdominowane', index=False)
+        k = list(data['przybliżenia'].keys())
+        for i, k_ in enumerate(k):
+            df_ = pd.DataFrame(data['przybliżenia'][k_])
+            worksheet = writer.sheets['Przybliżenia unii']
+            worksheet.write(i*num_class, 0, k_)
+            df_.to_excel(writer, sheet_name='Przybliżenia unii', startrow=i*num_class + 1, startcol=0, index=False)
+        df7 = pd.DataFrame(data['statystyki_przybliżeń'])
+        worksheet = writer.sheets['Przybliżenia unii']
+        worksheet.write(len(k) * num_class + 1, 0, 'Statystyki')
+        df7.to_excel(writer, sheet_name='Przybliżenia unii', startrow=len(k)*num_class + 2, startcol=0, index=False)
+        r = ['Reguła ' + str(i+1) for i in range(len(data['reguły']['rule type 1/3']))]
+        df8 = pd.DataFrame({'Oznaczenie reguły': r, 'Reguła': data['reguły']['rule type 1/3']})
+        df8.to_excel(writer, sheet_name='Reguły', index=False)
+        df9 = pd.DataFrame(data['statystyki_reguł']).transpose()
+        df9.to_excel(writer, sheet_name='Statystyki reguł', index=False)
+        cv = {(k,v) for k,v in zip(['accuracy', 'not_classified', 'correct', 'f1_score'], data['walidacja_krzyżowa'])}
+        df9 = pd.DataFrame(cv)
+        df9.to_excel(writer, sheet_name='Walidacja krzyżowa', index=False, header=False)
+        obj = ['a' + str(o) for o in range(len(data['walidacja_krzyżowa_szczegóły'][0]))]
+        df10 = pd.DataFrame({'Obiekt': obj, 'Przewidziana klasa': data['walidacja_krzyżowa_szczegóły'][0],
+                           'Prawdziwa klasa': data['walidacja_krzyżowa_szczegóły'][1]})
+        df10.to_excel(writer, sheet_name='Walidacja krzyżowa szczegóły', index=False)
+
+        """'walidacja_krzyżowa_szczegóły': details"""
     return 0
 
 
-def run_experiment_single(dataset_name, type, induction_algorithm, classification_algorithm):
+def run_experiment_single(dataset_name, type, induction_algorithm, classification_algorithm, name):
     a, p, o = read_dataset(dataset_name)
     dataset = prepare_dataset(a, p, o)
     if type == 'DRSA':
+        l = 1.0
         if classification_algorithm == 'old':
             (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, 1.0)
-            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, l)
+            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, 1.0)
         elif classification_algorithm == 'new':
             (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, 1.0)
-            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, l)
+            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, 1.0)
         (r, r_r, r_s), d = run_DRSA(dataset, induction_algorithm)
     elif type == 'VC-DRSA':
         range_ = [0.05 * i for i in range(1, 20)]
@@ -338,7 +384,7 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
         (r, r_r, r_s), d = run_VC_DRSA(dataset, induction_algorithm, l)
     data = {
         'zbiór': dataset,
-        'uruchomienie': {'wersja algorytmu': type, 'algorytm indukcji reguł': induction_algorithm, 'algorytm klasyfikacji': classification_algorithm},
+        'uruchomienie': {'wersja algorytmu': type, 'algorytm indukcji reguł': induction_algorithm, 'algorytm klasyfikacji': classification_algorithm, 'poziom spójności': l},
         'unie': d['unie'],
         'dominacja': d['dominacja'],
         'przybliżenia': d['approx'],
@@ -348,29 +394,29 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
         'walidacja_krzyżowa': (accuracy, not_classified, correct, f1_score),
         'walidacja_krzyżowa_szczegóły': details
     }
-    prepare_report(data)
+    prepare_report(data, name, len(find_all_possible_decision_classes(dataset))+1, len(data['zbiór']['attributes']))
 
 
 def run_experiment_full():
-    files = ['data\jose-medical-2017 (2).isf', 'data\jose-medical (1).isf']
-    for file in files:
+    files = ['data\jose-medical-2017 (2).isf']#, 'data\jose-medical (1).isf']
+    for i, file in enumerate(files):
         print("Working on file: " + file)
         print('DRSA, DOMLEM, OLD')
-        run_experiment_single(file, 'DRSA', 'DOMLEM', 'old')
+        run_experiment_single(file, 'DRSA', 'DOMLEM', 'old', 'DRSA_DOMLEM_OLD'+str(i))
         print('DRSA, DOMApriori, OLD')
-        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'old')
+        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'old', 'DRSA_DOMApriori_OLD'+str(i))
         print('DRSA, DOMLEM, NEW')
-        run_experiment_single(file, 'DRSA', 'DOMLEM', 'new')
+        run_experiment_single(file, 'DRSA', 'DOMLEM', 'new', 'DRSA_DOMLEM_NEW'+str(i))
         print('DRSA, DOMApriori, NEW')
-        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'new')
+        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'new', 'DRSA_DOMApriori_NEW'+str(i))
         print('VC-DRSA, DOMLEM, OLD')
-        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'old')
+        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'old', 'VC_DRSA_DOMLEM_OLD'+str(i))
         print('VC-DRSA, DOMApriori, OLD')
-        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'old')
+        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'old', 'VC_DRSA_DOMApriori_OLD'+str(i))
         print('VC-DRSA, DOMLEM, NEW')
-        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'new')
+        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'new', 'VC_DRSA_DOMLEM_NEW'+str(i))
         print('VC-DRSA, DOMApriori, NEW')
-        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'new')
+        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'new', 'VC_DRSA_DOMApriori_NEW'+str(i))
         print("Done")
 
 
