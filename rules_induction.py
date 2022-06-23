@@ -1,3 +1,6 @@
+import itertools
+
+
 def check_acceptance_element(candidate, dataset):
     if candidate['criterion'] is not None:
         if candidate['rule_type'] == 1 or candidate['rule_type'] == 2:
@@ -325,9 +328,217 @@ def DOMLEM_VC_DRSA(approx, dataset, l):
     return rules, rules_readable, rules_to_stats
 
 
-def DOMApriori_DRSA():
-    return 0, 0, 0
+def update_support(ck, x, approx):
+    for c_ in ck:
+        goal = len(c_['w'])
+        reach_goal = 0
+        for c in c_['w']:
+            if c['sign'] == '>=':
+                if x[c['criterion']+1] >= c['condition']:
+                    reach_goal += 1
+            else:
+                if x[c['criterion']+1] <= c['condition']:
+                    reach_goal += 1
+        if goal == reach_goal:
+            if x[0] in approx:
+                c_['positive_support'] += 1
+            else:
+                c_['negative_support'] += 1
 
 
-def DOMApriori_VC_DRSA():
-    return 0, 0, 0
+def create_conditions(approx, crits, rule_type, prefs, dataset, class_approx_name, min_support):
+    c1_ = []
+    for x in approx:
+        for a in crits:
+            if rule_type == 1 or rule_type == 2:
+                if prefs[a] == 'gain':
+                    w_ = {'criterion': a, 'condition': dataset[int(x[1:])-1][a+1], 'class': class_approx_name,
+                          'rule_type': rule_type, 'preference': prefs[a], 'covered': None, 'sign': '>='}
+                    w = {'w':[w_], 'positive_support':0, 'negative_support': 0}
+                else:
+                    w_ = {'criterion': a, 'condition': dataset[int(x[1:])-1][a+1], 'class': class_approx_name,
+                          'rule_type': rule_type, 'preference': prefs[a], 'covered': None, 'sign': '<='}
+                    w = {'w': [w_], 'positive_support': 0, 'negative_support': 0}
+            elif rule_type == 3 or rule_type == 4:
+                if prefs[a] == 'gain':
+                    w_ = {'criterion': a, 'condition': dataset[int(x[1:])-1][a+1], 'class': class_approx_name,
+                          'rule_type': rule_type, 'preference': prefs[a], 'covered': None, 'sign': '<='}
+                    w = {'w': [w_], 'positive_support': 0, 'negative_support': 0}
+                else:
+                    w_ = {'criterion': a, 'condition': dataset[int(x[1:])-1][a+1], 'class': class_approx_name,
+                          'rule_type': rule_type, 'preference': prefs[a], 'covered': None, 'sign': '>='}
+                    w = {'w': [w_], 'positive_support': 0, 'negative_support': 0}
+            if w not in c1_:
+                c1_.append(w)
+    for x in dataset:
+        update_support(c1_, x, approx)
+    l1 = [c for c in c1_ if c['positive_support'] >= min_support]
+    return l1, c1_
+
+
+def build_candidates(strong_sets, k):
+    l = [i for i in range(len(strong_sets))]
+    tmp = list(itertools.combinations(set(l), k))
+    return [(strong_sets[n[0]], strong_sets[n[1]]) for n in tmp]
+
+
+def apriori2_gen(strong_sets, k):
+    ck_ = []
+    cand = build_candidates(strong_sets, 2)
+    print("str_set: ", len(strong_sets))
+    for c in cand:
+        p = c[0]
+        q = c[1]
+        if p['negative_support'] > 0 and q['negative_support'] > 0:
+            ok = True
+            for i in range(k-1):
+                if p['w'][i] != q['w'][i]:
+                    ok = False
+            if ok and p['w'][k-1]['criterion'] != q['w'][k-1]['criterion'] and p['w'][k-1]['condition'] < q['w'][k-1]['criterion']:
+                c = {'w': p['w'][:-1] + list(q['w'][-1]), 'positive_support': 0, 'negative_support': 0}
+                ck_.append(c)
+    ck_new = []
+    for s in ck_:
+        if s in strong_sets:
+            ck_new.append(s)
+    return ck_new
+
+
+def check_generality(c_, c):
+    if c['w'] in c_['w'] and c['positive_support'] < c_['positive_support']:
+        return True
+    else:
+        return False
+
+
+def find_covered(c, dataset):
+    covered = []
+    for x in dataset:
+        if c['sign'] == '>=':
+            if x[c['criterion'] + 1] >= c['condition']:
+                covered.append(x[0])
+        else:
+            if x[c['criterion'] + 1] <= c['condition']:
+                covered.append(x[0])
+    return covered
+
+
+def build_tmp_rules_DOMA_priori(ls, dataset):
+    rules = []
+    for candidates in ls:
+        r_ = []
+        cov = []
+        for candidate in candidates:
+            for c in candidate['w']:
+                if c['rule_type'] == 1 or c['rule_type'] == 2:
+                    if c['preference'] == 'gain':
+                        sign = ">= "
+                    else:
+                        sign = "<= "
+                elif c['rule_type'] == 3 or c['rule_type'] == 4:
+                    if c['preference'] == 'gain':
+                        sign = "<= "
+                    else:
+                        sign = ">= "
+                r = c
+                rule_type = c['rule_type']
+                cov.append(find_covered(c, dataset))
+                r['sign'] = sign
+                r_.append(r)
+        if len(cov) == 0:
+            result = []
+        else:
+            result = set(cov[0])
+        if len(cov) > 1:
+            for s in cov[1:]:
+                result.intersection_update(s)
+        r_.append(list(result))
+        r_.append(rule_type)
+        rules.append(r_)
+    return rules
+
+
+def apriori_dom_rules(class_approx, dataset, rule_type, class_approx_name, max_length, min_support):
+    criteria = [c['preference'] for c in dataset['attributes']]
+    crits = [i for i in range(len(criteria)-1)]
+    l1, c1 = create_conditions(class_approx, crits,  rule_type, criteria[:-1], dataset['objects'], class_approx_name, min_support)
+    l_k_1 = l1
+    print('l_k_1', l_k_1)
+    ls = [l1]
+    k = 2
+    while len(l_k_1) != 0 and k < max_length:
+        ck = apriori2_gen(l_k_1, k-1)
+        for x in dataset['objects']:
+            update_support(ck, x, class_approx)
+        lk = [c for c in ck if c['positive_support'] >= min_support]
+        l_k_1 = lk
+        ls.append(lk)
+        k += 1
+    for i,lk in enumerate(ls):
+        lk_new = []
+        for c in lk:
+            if c['negative_support'] <= 0:
+                lk_new.append(c)
+        ls[i] = lk_new
+        for n,lk in enumerate(ls[1:]):
+            lk_new = []
+            for c in lk:
+                for lj in reversed(ls[1:n+1]):
+                    for c_ in lj:
+                        if not check_generality(c_, c):
+                            lk_new.append(c)
+            ls[n+1] = lk_new
+    return build_tmp_rules_DOMA_priori(ls, dataset['objects'])
+
+
+def minimal_rule_set_DOMA_priori():
+    return 0
+
+
+def DOMApriori_DRSA(approx, dataset, max_length, min_support):
+    rules = {'rule type 1/3': [], 'rule type 2/4': []}
+    rules_tmp = [[], []]
+
+    # RULE TYPE 3
+    for a in approx['lower_approx_downward_union']:
+        rules_tmp[0] += minimal_rule_set(find_rules(a['objects'], dataset, 3, a['union']), a['objects'])
+
+    # RULE TYPE 1
+    for a in reversed(approx['lower_approx_upward_union']):
+        rules_tmp[0] += apriori_dom_rules(a['objects'], dataset, 1, a['union'], max_length, min_support)#minimal_rule_set(, a['objects'])
+    rules['rule type 1/3'] = rules_tmp[0]
+
+    # RULE TYPE 2
+    #for a in reversed(approx['upper_approx_upward_union']):
+        #rules_tmp[1] += minimal_rule_set(find_rules(a['objects'], dataset, 2, a['union']), a['objects'])
+
+    # RULE TYPE 4
+    #for a in approx['upper_approx_downward_union']:
+        #rules_tmp[1] += minimal_rule_set(find_rules(a['objects'], dataset, 4, a['union']), a['objects'])
+    #rules['rule type 2/4'] = rules_tmp[1]
+
+    criteria = [c['name'] for c in dataset['attributes']]
+    rules_readable = {'rule type 1/3': build_rules(rules['rule type 1/3'], criteria)}#,
+                      #'rule type 2/4': build_rules(rules['rule type 2/4'], criteria)}
+    rules_to_stats = {'rule type 1/3': build_rules_to_calculation(rules['rule type 1/3'], criteria)}#,
+                      #'rule type 2/4': build_rules_to_calculation(rules['rule type 2/4'], criteria)}
+    return rules, rules_readable, rules_to_stats
+
+
+def DOMApriori_VC_DRSA(approx, dataset, l, max_length, min_support):
+    rules = {'rule type 1/3': []}
+    rules_tmp = []
+
+    # RULE TYPE 3
+    for a in approx['lower_approx_downward_union']:
+        rules_tmp += minimal_rule_set(find_rules_VC(a['objects'], dataset, 3, a['union'], l), a['objects'])
+
+    # RULE TYPE 1
+    for a in reversed(approx['lower_approx_upward_union']):
+        rules_tmp += minimal_rule_set(find_rules_VC(a['objects'], dataset, 1, a['union'], l), a['objects'])
+    rules['rule type 1/3'] = rules_tmp
+
+    criteria = [c['name'] for c in dataset['attributes']]
+    rules_readable = {'rule type 1/3': build_rules(rules['rule type 1/3'], criteria)}
+    rules_to_stats = {'rule type 1/3': build_rules_to_calculation(rules['rule type 1/3'], criteria)}
+    return rules, rules_readable, rules_to_stats

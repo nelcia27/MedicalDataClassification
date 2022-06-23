@@ -6,7 +6,7 @@ from sklearn.metrics import f1_score
 import pandas as pd
 
 
-def run_DRSA(dataset, algorithm):
+def run_DRSA(dataset, algorithm, max_length, min_support):
     downward_union = find_downward_union_of_classes(dataset)
     upward_union = find_upward_union_of_classes(dataset)
     dominating_set = find_dominating_set(dataset)
@@ -35,9 +35,9 @@ def run_DRSA(dataset, algorithm):
     if algorithm == 'DOMLEM':
         return DOMLEM_DRSA(approx_DRSA, dataset), data
     elif algorithm == 'DOMApriori':
-        return DOMApriori_DRSA(), data
+        return DOMApriori_DRSA(approx_DRSA, dataset, max_length, min_support), data
 
-def run_VC_DRSA(dataset, algorithm, l):
+def run_VC_DRSA(dataset, algorithm, l, max_length, min_support):
     downward_union = find_downward_union_of_classes(dataset)
     upward_union = find_upward_union_of_classes(dataset)
     dominating_set = find_dominating_set(dataset)
@@ -66,7 +66,7 @@ def run_VC_DRSA(dataset, algorithm, l):
     if algorithm == 'DOMLEM':
         return DOMLEM_VC_DRSA(approx_VC_DRSA, dataset, l), data
     elif algorithm == 'DOMApriori':
-        return DOMApriori_VC_DRSA(), data
+        return DOMApriori_VC_DRSA(approx_VC_DRSA, dataset, l, max_length, min_support), data
 
 
 def find_interesting_labels(labels_candidates, expected_result):
@@ -81,7 +81,7 @@ def find_interesting_labels(labels_candidates, expected_result):
         return labels_candidates
 
 
-def leave_one_out_simple_classification(dataset_name, type, algorithm, l):
+def leave_one_out_simple_classification(dataset_name, type, algorithm, l, max_length, min_support):
     a, p, o = read_dataset(dataset_name)
     dataset = prepare_dataset(a, p, o)
     classes = find_all_possible_decision_classes(dataset)
@@ -89,11 +89,11 @@ def leave_one_out_simple_classification(dataset_name, type, algorithm, l):
     result = []
     if type == "VC-DRSA":
         for f in folds:
-            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l, max_length, min_support)
             result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
     else:
         for f in folds:
-            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm, max_length, min_support)
             result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
     expected_result = [f['test'][-1] for f in folds]
     good = []
@@ -123,7 +123,7 @@ def leave_one_out_simple_classification(dataset_name, type, algorithm, l):
     return accuracy, not_classified, correct, f1_score(expected_result, y_pred, labels=labels, average='weighted')
 
 
-def leave_one_out_new_scheme_classification(dataset_name, type, algorithm, l):
+def leave_one_out_new_scheme_classification(dataset_name, type, algorithm, l, max_length, min_support):
     a, p, o = read_dataset(dataset_name)
     dataset = prepare_dataset(a, p, o)
     classes = find_all_possible_decision_classes(dataset)
@@ -133,13 +133,13 @@ def leave_one_out_new_scheme_classification(dataset_name, type, algorithm, l):
         for f in folds:
             downward_union = find_downward_union_of_classes(dataset)
             upward_union = find_upward_union_of_classes(dataset)
-            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l, max_length, min_support)
             result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
     else:
         for f in folds:
             downward_union = find_downward_union_of_classes(dataset)
             upward_union = find_upward_union_of_classes(dataset)
-            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm, max_length, min_support)
             result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
     expected_result = [f['test'][-1] for f in folds]
     good = []
@@ -169,14 +169,14 @@ def leave_one_out_new_scheme_classification(dataset_name, type, algorithm, l):
     return accuracy, not_classified, correct, f1_score(expected_result, y_pred, labels=labels, average='weighted')
 
 
-def find_best_model(dataset_name, range_, new_scheme, algorithm):
+def find_best_model(dataset_name, range_, new_scheme, algorithm, max_length, min_support):
     best = []
     best_scores = (0.0, 0.0, 0.0, 0.0)
     error_range = []
     if new_scheme:
         for l in range_:
             try:
-                accuracy, not_classified, correct, f1_score = leave_one_out_new_scheme_classification(dataset_name, 'VC-DRSA', algorithm, l)
+                accuracy, not_classified, correct, f1_score = leave_one_out_new_scheme_classification(dataset_name, 'VC-DRSA', algorithm, l, max_length, min_support)
             except:
                 error_range.append(l)
                 continue
@@ -204,7 +204,7 @@ def find_best_model(dataset_name, range_, new_scheme, algorithm):
     else:
         for l in range_:
             try:
-                accuracy, not_classified, correct, f1_score = leave_one_out_simple_classification(dataset_name, 'VC-DRSA', algorithm, l)
+                accuracy, not_classified, correct, f1_score = leave_one_out_simple_classification(dataset_name, 'VC-DRSA', algorithm, l, max_length, min_support)
             except:
                 error_range.append(l)
                 continue
@@ -233,7 +233,7 @@ def find_best_model(dataset_name, range_, new_scheme, algorithm):
     return best, best_scores
 
 
-def leave_one_out_old_full(dataset_name, type, algorithm, l):
+def leave_one_out_old_full(dataset_name, type, algorithm, l, max_length, min_support):
     a, p, o = read_dataset(dataset_name)
     dataset = prepare_dataset(a, p, o)
     classes = find_all_possible_decision_classes(dataset)
@@ -242,17 +242,17 @@ def leave_one_out_old_full(dataset_name, type, algorithm, l):
     result = []
     if type == "VC-DRSA":
         for f in folds:
-            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l, max_length, min_support)
             result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
     else:
         for f in folds:
-            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm, max_length, min_support)
             result.append(classify_simple(f['test'], r['rule type 1/3'], classes)[0])
     expected_result = [o[-1] for o in dataset['objects']]
     return result, expected_result
 
 
-def leave_one_out_new_full(dataset_name, type, algorithm, l):
+def leave_one_out_new_full(dataset_name, type, algorithm, l, max_length, min_support):
     a, p, o = read_dataset(dataset_name)
     dataset = prepare_dataset(a, p, o)
     classes = find_all_possible_decision_classes(dataset)
@@ -263,14 +263,13 @@ def leave_one_out_new_full(dataset_name, type, algorithm, l):
         for f in folds:
             downward_union = find_downward_union_of_classes(dataset)
             upward_union = find_upward_union_of_classes(dataset)
-            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l)
-            result.append(
-                classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l, max_length, min_support)
+            result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
     else:
         for f in folds:
             downward_union = find_downward_union_of_classes(dataset)
             upward_union = find_upward_union_of_classes(dataset)
-            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm)
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm, max_length, min_support)
             result.append(classify_new_scheme(f['test'], r['rule type 1/3'], classes, f['train'], downward_union, upward_union)[0])
     expected_result = [o[-1] for o in dataset['objects']]
     return result, expected_result
@@ -346,42 +345,40 @@ def prepare_report(data, name, num_class, num_attributes):
         df10 = pd.DataFrame({'Obiekt': obj, 'Przewidziana klasa': data['walidacja_krzyżowa_szczegóły'][0],
                            'Prawdziwa klasa': data['walidacja_krzyżowa_szczegóły'][1]})
         df10.to_excel(writer, sheet_name='Walidacja krzyżowa szczegóły', index=False)
-
-        """'walidacja_krzyżowa_szczegóły': details"""
     return 0
 
 
-def run_experiment_single(dataset_name, type, induction_algorithm, classification_algorithm, name):
+def run_experiment_single(dataset_name, type, induction_algorithm, classification_algorithm, name, max_length, min_support):
     a, p, o = read_dataset(dataset_name)
     dataset = prepare_dataset(a, p, o)
     if type == 'DRSA':
         l = 1.0
         if classification_algorithm == 'old':
-            (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, 1.0)
+            (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, 1.0, max_length, min_support)
             details = leave_one_out_old_full(dataset_name, type, induction_algorithm, 1.0)
         elif classification_algorithm == 'new':
-            (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, 1.0)
+            (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, 1.0, max_length, min_support)
             details = leave_one_out_new_full(dataset_name, type, induction_algorithm, 1.0)
-        (r, r_r, r_s), d = run_DRSA(dataset, induction_algorithm)
+        (r, r_r, r_s), d = run_DRSA(dataset, induction_algorithm, max_length, min_support)
     elif type == 'VC-DRSA':
         range_ = [0.05 * i for i in range(1, 20)]
         if classification_algorithm == 'old':
-            b, _ = find_best_model(dataset_name, range_, False, induction_algorithm)
+            b, _ = find_best_model(dataset_name, range_, False, induction_algorithm, max_length, min_support)
             if len(b) > 1:
                 l = b[len(b)//2]
             else:
                 l = b[0]
-            (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, l)
-            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, l)
+            (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, l, max_length, min_support)
+            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, l, max_length, min_support)
         elif classification_algorithm == 'new':
             b, _ = find_best_model(dataset_name, range_, True, induction_algorithm)
             if len(b) > 1:
                 l = b[len(b)//2]
             else:
                 l = b[0]
-            (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, l)
-            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, l)
-        (r, r_r, r_s), d = run_VC_DRSA(dataset, induction_algorithm, l)
+            (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, l, max_length, min_support)
+            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, l, max_length, min_support)
+        (r, r_r, r_s), d = run_VC_DRSA(dataset, induction_algorithm, l, max_length, min_support)
     data = {
         'zbiór': dataset,
         'uruchomienie': {'wersja algorytmu': type, 'algorytm indukcji reguł': induction_algorithm, 'algorytm klasyfikacji': classification_algorithm, 'poziom spójności': l},
@@ -397,34 +394,38 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
     prepare_report(data, name, len(find_all_possible_decision_classes(dataset))+1, len(data['zbiór']['attributes']))
 
 
-def run_experiment_full():
+def run_experiment_full(max_length, min_support):
     files = ['data\jose-medical-2017 (2).isf']#, 'data\jose-medical (1).isf']
     for i, file in enumerate(files):
         print("Working on file: " + file)
         print('DRSA, DOMLEM, OLD')
-        run_experiment_single(file, 'DRSA', 'DOMLEM', 'old', 'DRSA_DOMLEM_OLD'+str(i))
+        run_experiment_single(file, 'DRSA', 'DOMLEM', 'old', 'DRSA_DOMLEM_OLD'+str(i), max_length, min_support)
         print('DRSA, DOMApriori, OLD')
-        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'old', 'DRSA_DOMApriori_OLD'+str(i))
+        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'old', 'DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
         print('DRSA, DOMLEM, NEW')
-        run_experiment_single(file, 'DRSA', 'DOMLEM', 'new', 'DRSA_DOMLEM_NEW'+str(i))
+        run_experiment_single(file, 'DRSA', 'DOMLEM', 'new', 'DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
         print('DRSA, DOMApriori, NEW')
-        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'new', 'DRSA_DOMApriori_NEW'+str(i))
+        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'new', 'DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
         print('VC-DRSA, DOMLEM, OLD')
-        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'old', 'VC_DRSA_DOMLEM_OLD'+str(i))
+        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'old', 'VC_DRSA_DOMLEM_OLD'+str(i), max_length, min_support)
         print('VC-DRSA, DOMApriori, OLD')
-        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'old', 'VC_DRSA_DOMApriori_OLD'+str(i))
+        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'old', 'VC_DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
         print('VC-DRSA, DOMLEM, NEW')
-        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'new', 'VC_DRSA_DOMLEM_NEW'+str(i))
+        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'new', 'VC_DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
         print('VC-DRSA, DOMApriori, NEW')
-        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'new', 'VC_DRSA_DOMApriori_NEW'+str(i))
+        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'new', 'VC_DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
         print("Done")
 
 
-run_experiment_full()
+#run_experiment_full(max_length, min_support)
 
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
 # run_VC_DRSA('data\exampleStef.isf', 0.8)
-
+a, p, o = read_dataset('data\exampleStef.isf')
+dataset = prepare_dataset(a, p, o)
+(_, r, _), d = run_DRSA(dataset, "DOMApriori", 3, 2)
+print(r)
+print(len(r['rule type 1/3']))
 #print("new")
 #print(leave_one_out_new_scheme_classification('data\jose-medical-2017 (2).isf', 'DRSA', 1.0))
 #print("simple")
