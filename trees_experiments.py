@@ -1,6 +1,5 @@
 from MedicalDataClassification.helpers import *
 from sklearn import tree
-from sklearn.model_selection import KFold
 from sklearn.model_selection import GridSearchCV
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
@@ -43,14 +42,12 @@ def find_best_forest(X, y):
     return clf.best_estimator_, clf.best_params_, clf.best_score_, clf.cv_results_
 
 
-def prepare_report(dataset, data, is_tree, name, num_attributes, X, y):
-    #+ to co daje w best score, wyniki cross-valid
-    #rysunki:
-    # dla drzew:
-    # dla lasów:
+def prepare_report(dataset, data, is_tree, name, X, y):
+    attributes = [o['name'] for o in dataset['attributes']]
+    num_attributes = len(attributes[:-1])
     with pd.ExcelWriter('results\dec_trees\File'+name+'.xlsx', engine='xlsxwriter') as writer:
         workbook = writer.book
-        for s in ['Zbiór', 'Dane uruchomienia', 'Wyniki najlepszego',  'Walidacja krzyżowa']:
+        for s in ['Zbiór', 'Dane uruchomienia', 'Wyniki najlepszego',  'Walidacja krzyżowa - trafność', 'Walidacja krzyżowa - f1']:
             worksheet = workbook.add_worksheet(s)
             writer.sheets[s] = worksheet
         df = pd.DataFrame(dataset['attributes'])
@@ -67,9 +64,9 @@ def prepare_report(dataset, data, is_tree, name, num_attributes, X, y):
         clf = data[0]
         res = []
         for index, row in X.iterrows():
-            res.append(clf.predict(row))
+            res.append(clf.predict([row]))
         df3 = pd.DataFrame({"Przewidziana klasa": y, "Prawdziwa klasa": res})
-        df3.to_excel(writer, sheet_name='Wyniki najlepszego', startrow=2, startcol=0, index=False)
+        df3.to_excel(writer, sheet_name='Wyniki najlepszego', startrow=4, startcol=0, index=False)
         good = []
         bad = []
         bad_classified = []
@@ -85,18 +82,50 @@ def prepare_report(dataset, data, is_tree, name, num_attributes, X, y):
         d = (accuracy, correct, f1_score(y, res, average='weighted'))
         cv = {(k, v) for k, v in zip(['accuracy', 'correct', 'f1_score'], d)}
         df4 = pd.DataFrame(cv)
-        df4.to_excel(writer, sheet_name='Wyniki najlepszego', startrow=4, startcol=0, index=False, header=False)
-        
+        df4.to_excel(writer, sheet_name='Wyniki najlepszego', startrow=2, startcol=0, index=False, header=False)
+        df5 = pd.concat([pd.DataFrame(data[3]["params"]), pd.DataFrame(data[3]["mean_test_accuracy"], columns=["Accuracy"])], axis=1)
+        df5.to_excel(writer, sheet_name='Walidacja krzyżowa - trafność', index=False)
+        df6 = pd.concat([pd.DataFrame(data[3]["params"]), pd.DataFrame(data[3]["mean_test_f1_weighted"], columns=["F1_weighted"])], axis=1)
+        df6.to_excel(writer, sheet_name='Walidacja krzyżowa - f1', index=False)
+    clf = data[0]
+    if is_tree:
+        plt.figure(figsize=(12, 12))
+        tree.plot_tree(clf, fontsize=10, feature_names=attributes[:-1], filled=True, impurity=True, rounded=True)
+        plt.savefig('results\dec_trees\ImageTree'+name+'.png', bbox_inches='tight')
+    else:
+        n_estimators = len(clf.estimators_)
+        figure, axis = plt.subplots(n_estimators, 2)
+        for i in range(n_estimators):
+            tree.plot_tree(clf.estimators_[i], feature_names=attributes[:-1], filled=True, impurity=True, rounded=True, fontsize=10, ax=axis[i, 0])
+        plt.savefig('results\dec_trees\ImageRF' + name + '.png', bbox_inches='tight')
+    return 0
 
 
+def run_experiment_single(dataset_name, type, name):
+    a, p, o = read_dataset(dataset_name)
+    dataset = prepare_dataset(a, p, o)
+    ds = dataset_to_trees(dataset)
+    cols = list(ds.columns)
+    X = ds[cols[:-1]]
+    y = ds[cols[-1]].values
+    if type == 'tree':
+        prepare_report(dataset, find_best_tree(X, y), True, name, X, y)
+    elif type == 'rf':
+        prepare_report(dataset, find_best_forest(X, y), False, name, X, y)
 
+
+def run_experiment_full():
+    files = ['data\jose-medical-2017 (2).isf']  # , 'data\jose-medical (1).isf']
+    for i, file in enumerate(files):
+        print("Working on file: " + file)
+        print('Tree')
+        run_experiment_single(file, 'tree', 'tree' + str(i))
+        print('Random Forest')
+        run_experiment_single(file, 'rf', 'random_forest'+str(i))
+        print("Done")
+
+
+run_experiment_full()
 #'jose-medical-2017 (2).isf')jose-medical (1).isf
-a, p, o = read_dataset('data\jose-medical-2017 (2).isf')
-dataset = prepare_dataset(a, p, o)
-ds = dataset_to_trees(dataset)
-cols = list(ds.columns)
-X = ds[cols[:-1]]
-print(type(X))
-y = ds[cols[-1]].values
 #print(find_best_forest(X, y))
 #print(find_best_tree(X, y))
