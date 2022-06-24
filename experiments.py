@@ -355,10 +355,10 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
         l = 1.0
         if classification_algorithm == 'old':
             (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, 1.0, max_length, min_support)
-            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, 1.0)
+            details = leave_one_out_old_full(dataset_name, type, induction_algorithm, 1.0, max_length, min_support)
         elif classification_algorithm == 'new':
             (accuracy, not_classified, correct, f1_score) = leave_one_out_new_scheme_classification(dataset_name, type, induction_algorithm, 1.0, max_length, min_support)
-            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, 1.0)
+            details = leave_one_out_new_full(dataset_name, type, induction_algorithm, 1.0, max_length, min_support)
         (r, r_r, r_s), d = run_DRSA(dataset, induction_algorithm, max_length, min_support)
     elif type == 'VC-DRSA':
         range_ = [0.05 * i for i in range(1, 20)]
@@ -371,7 +371,7 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
             (accuracy, not_classified, correct, f1_score) = leave_one_out_simple_classification(dataset_name, type, induction_algorithm, l, max_length, min_support)
             details = leave_one_out_old_full(dataset_name, type, induction_algorithm, l, max_length, min_support)
         elif classification_algorithm == 'new':
-            b, _ = find_best_model(dataset_name, range_, True, induction_algorithm)
+            b, _ = find_best_model(dataset_name, range_, True, induction_algorithm, max_length, min_support)
             if len(b) > 1:
                 l = b[len(b)//2]
             else:
@@ -395,7 +395,7 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
 
 
 def run_experiment_full(max_length, min_support):
-    files = ['data\jose-medical-2017 (2).isf']#, 'data\jose-medical (1).isf']
+    files = ['data\jose-medical-2017 (2).isf', 'data\jose-medical (1).isf']
     for i, file in enumerate(files):
         print("Working on file: " + file)
         print('DRSA, DOMLEM, OLD')
@@ -417,7 +417,7 @@ def run_experiment_full(max_length, min_support):
         print("Done")
 
 
-#run_experiment_full(max_length, min_support)
+run_experiment_full(2, 2)
 
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
 # run_VC_DRSA('data\exampleStef.isf', 0.8)
