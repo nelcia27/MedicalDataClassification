@@ -1,4 +1,5 @@
 import itertools
+import pandas as pd
 
 
 def read_dataset(file):
@@ -77,4 +78,16 @@ def calculate_accuracy_of_approximation_per_union(lower_approx, upper_approx):
         else:
             accuracy[l['union']] = 0.0
     return accuracy
+
+
+def dataset_to_trees(dataset):
+    columns_names = [n['name'] for n in dataset['attributes']]
+    objects = [o[1:] for o in dataset['objects']]
+    columns = []
+    for i,c in enumerate(columns_names):
+        columns.append([o[i] for o in objects])
+    d = {k:v for k,v in zip(columns_names,columns)}
+    df = pd.DataFrame(d)
+    return df
+
 
