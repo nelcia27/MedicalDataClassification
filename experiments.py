@@ -279,9 +279,9 @@ def calculate_rules_stats(rules, approx, size):
     stats = {}
     cnt = 1
     for rule in rules:
-        if rule['class'][6] == '>':
+        if rule['class'][6] == '<':
             val = len(approx["lower_approx_downward_union"][int(rule['class'][-1])-1]['objects'])
-        elif rule['class'][6] == '<':
+        elif rule['class'][6] == '>':
             val = len(approx["lower_approx_upward_union"][int(rule['class'][-1])-2]['objects'])
         if val != 0:
             stats[cnt] = {'support': len(rule['covered']),
@@ -345,7 +345,6 @@ def prepare_report(data, name, num_class, num_attributes):
         df10 = pd.DataFrame({'Obiekt': obj, 'Przewidziana klasa': data['walidacja_krzyżowa_szczegóły'][0],
                            'Prawdziwa klasa': data['walidacja_krzyżowa_szczegóły'][1]})
         df10.to_excel(writer, sheet_name='Walidacja krzyżowa szczegóły', index=False)
-    return 0
 
 
 def run_experiment_single(dataset_name, type, induction_algorithm, classification_algorithm, name, max_length, min_support):
@@ -399,33 +398,44 @@ def run_experiment_full(max_length, min_support):
     for i, file in enumerate(files):
         print("Working on file: " + file)
         print('DRSA, DOMLEM, OLD')
-        run_experiment_single(file, 'DRSA', 'DOMLEM', 'old', 'DRSA_DOMLEM_OLD'+str(i), max_length, min_support)
+        #run_experiment_single(file, 'DRSA', 'DOMLEM', 'old', 'DRSA_DOMLEM_OLD'+str(i), max_length, min_support)
         print('DRSA, DOMApriori, OLD')
-        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'old', 'DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
+        run_experiment_single(file, 'DRSA', 'DOMApriori', 'old', 'DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
         print('DRSA, DOMLEM, NEW')
-        run_experiment_single(file, 'DRSA', 'DOMLEM', 'new', 'DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
+        #run_experiment_single(file, 'DRSA', 'DOMLEM', 'new', 'DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
         print('DRSA, DOMApriori, NEW')
-        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'new', 'DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
+        run_experiment_single(file, 'DRSA', 'DOMApriori', 'new', 'DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
         print('VC-DRSA, DOMLEM, OLD')
-        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'old', 'VC_DRSA_DOMLEM_OLD'+str(i), max_length, min_support)
+        #run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'old', 'VC_DRSA_DOMLEM_OLD'+str(i), max_length, min_support)
         print('VC-DRSA, DOMApriori, OLD')
-        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'old', 'VC_DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
+        run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'old', 'VC_DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
         print('VC-DRSA, DOMLEM, NEW')
-        run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'new', 'VC_DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
+        #run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'new', 'VC_DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
         print('VC-DRSA, DOMApriori, NEW')
-        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'new', 'VC_DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
+        run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'new', 'VC_DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
         print("Done")
 
 
-run_experiment_full(2, 2)
+run_experiment_full(10, 2)
 
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
-# run_VC_DRSA('data\exampleStef.isf', 0.8)
-a, p, o = read_dataset('data\exampleStef.isf')
-dataset = prepare_dataset(a, p, o)
-(_, r, _), d = run_DRSA(dataset, "DOMApriori", 3, 2)
-print(r)
-print(len(r['rule type 1/3']))
+
+#a, p, o = read_dataset('data\exampleStef.isf')
+#dataset = prepare_dataset(a, p, o)
+#(_, r, r_s), d = run_DRSA(dataset, "DOMApriori", 3, 2)
+#print(r_s)
+#print(r['rule type 1/3'])
+#print(r['rule type 2/4'])
+#print(_)
+#print(len(r['rule type 1/3']))
+#print(len(r['rule type 2/4']))
+
+#print("VC")
+#(_, r, r_s), d = run_VC_DRSA(dataset, "DOMApriori", 0.8, 3, 2)
+#print(r_s)
+#print(r['rule type 1/3'])
+#print(_)
+#print(len(r['rule type 1/3']))
 #print("new")
 #print(leave_one_out_new_scheme_classification('data\jose-medical-2017 (2).isf', 'DRSA', 1.0))
 #print("simple")
