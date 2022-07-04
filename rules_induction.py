@@ -450,7 +450,7 @@ def apriori2_gen(strong_sets, k):
 def check_generality(c_, c):
     c_acc = c['positive_support']
     c__acc = c_['positive_support']
-    if c_acc < c__acc:
+    if c_acc <= c__acc:
         ok = 0
         for c1 in c['w']:
             for c2 in c_['w']:
@@ -535,18 +535,21 @@ def apriori_dom_rules(class_approx, dataset, rule_type, class_approx_name, max_l
         lk_delete = []
         for l1 in lk:
             for l2 in lk:
-                if len(l1['w']) < len(l2['w']):
-                    d = check_generality(l1, l2)
-                elif len(l1['w']) > len(l2['w']):
-                    d = check_generality(l2, l1)
-                elif len(l1['w']) == len(l2['w']):
-                    d = check_generality(l2, l1)
-                    if d is None:
+                if l1 != l2:
+                    if len(l1['w']) < len(l2['w']):
                         d = check_generality(l1, l2)
-                    else:
+                    elif len(l1['w']) > len(l2['w']):
+                        d = check_generality(l2, l1)
+                    elif len(l1['w']) == len(l2['w']):
+                        d = check_generality(l2, l1)
+                        if d is None:
+                            d = check_generality(l1, l2)
+                        else:
+                            lk_delete.append(d)
+                            d = check_generality(l1, l2)
+                            lk_delete.append(d)
+                    if d is not None:
                         lk_delete.append(d)
-                if d is not None:
-                    lk_delete.append(d)
         ls[i] = [e for e in lk if e not in lk_delete]
     ls_ = []
     for l in ls:
@@ -562,7 +565,7 @@ def apriori_dom_rules(class_approx, dataset, rule_type, class_approx_name, max_l
 def check_generality_v2(c_, c):
     c_acc = len(c[-2])
     c__acc = len(c_[-2])
-    if c_acc < c__acc:
+    if c_acc <= c__acc:
         ok = 0
         for c1 in c[:-2]:
             for c2 in c_[:-2]:
@@ -681,7 +684,7 @@ def DOMApriori_DRSA(approx, dataset, max_length, min_support):
 def check_generality_VC(c_, c):
     c_acc = float(c['positive_support'])/float(c['positive_support'] + c['negative_support'])
     c__acc = float(c_['positive_support'])/float(c_['positive_support'] + c_['negative_support'])
-    if c_acc < c__acc:
+    if c_acc <= c__acc:
         ok = 0
         for c1 in c['w']:
             for c2 in c_['w']:
@@ -737,18 +740,22 @@ def apriori_dom_rules_VC(class_approx, dataset, rule_type, class_approx_name, ma
         lk_delete = []
         for l1 in lk:
             for l2 in lk:
-                if len(l1['w']) < len(l2['w']):
-                    d = check_generality_VC(l1, l2)
-                elif len(l1['w']) > len(l2['w']):
-                    d = check_generality_VC(l2, l1)
-                elif len(l1['w']) == len(l2['w']):
-                    d = check_generality_VC(l2, l1)
-                    if d is None:
+                if l1 != l2:
+                    if len(l1['w']) < len(l2['w']):
                         d = check_generality_VC(l1, l2)
-                    else:
+                    elif len(l1['w']) > len(l2['w']):
+                        d = check_generality_VC(l2, l1)
+                    elif len(l1['w']) == len(l2['w']):
+                        d = check_generality_VC(l2, l1)
+                        if d is None:
+                            d = check_generality_VC(l1, l2)
+                        else:
+                            lk_delete.append(d)
+                            d = check_generality_VC(l1, l2)
+                            if d is not None:
+                                lk_delete.append(d)
+                    if d is not None:
                         lk_delete.append(d)
-                if d is not None:
-                    lk_delete.append(d)
         ls[i] = [e for e in lk if e not in lk_delete]
     ls_ = []
     for l in ls:
@@ -766,7 +773,7 @@ def check_generality_VC_v2(c_, c, approx):
     c2_p = len([e for e in c_[-2] if e in approx])
     c_acc = float(c1_p)/float(len(c[-2]))
     c__acc = float(c2_p)/float(len(c_[-2]))
-    if c_acc < c__acc:
+    if c_acc <= c__acc:
         ok = 0
         for c1 in c[:-2]:
             for c2 in c_[:-2]:
@@ -825,6 +832,15 @@ def minimal_check_VC(rules, approx):
     return [e for e in rules if e not in rules_to_delete]
 
 
+def delete_doubled(rules_prev, rules_new):
+    rules_to_delete = []
+    for r1 in rules_prev:
+        for r2 in rules_new:
+            if [(r['condition'], r['criterion']) for r in r1[:-2]] == [(r['condition'], r['criterion']) for r in r2[:-2]]:
+                rules_to_delete.append(r2)
+    return [e for e in rules_new if e not in rules_to_delete]
+
+
 def DOMApriori_VC_DRSA(approx, dataset, l, max_length, min_support):
     rules = {'rule type 1/3': []}
     rules_tmp = [[], []]
@@ -832,13 +848,13 @@ def DOMApriori_VC_DRSA(approx, dataset, l, max_length, min_support):
     # RULE TYPE 3
     for a in approx['lower_approx_downward_union']:
         new_rules = apriori_dom_rules_VC(a['objects'], dataset, 3, a['union'], max_length, min_support, l)
-        n_r = minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[0], new_rules, a['objects']), a['objects'])
+        n_r = delete_doubled(rules_tmp[0], minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[0], new_rules, a['objects']), a['objects']))
         rules_tmp[0] += n_r
 
     # RULE TYPE 1
     for a in reversed(approx['lower_approx_upward_union']):
         new_rules = apriori_dom_rules_VC(a['objects'], dataset, 1, a['union'], max_length, min_support, l)
-        n_r = minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[1], new_rules, a['objects']), a['objects'])
+        n_r = delete_doubled(rules_tmp[1], minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[1], new_rules, a['objects']), a['objects']))
         rules_tmp[1] += n_r
     rules['rule type 1/3'] = rules_tmp[0] + rules_tmp[1]
 
