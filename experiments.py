@@ -420,25 +420,22 @@ run_experiment_full(10, 2)
 
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
 
-#a, p, o = read_dataset('data\exampleStef.isf')
-#dataset = prepare_dataset(a, p, o)
-#(_, r, r_s), d = run_DRSA(dataset, "DOMApriori", 3, 2)
+a, p, o = read_dataset('data\exampleStef.isf')
+dataset = prepare_dataset(a, p, o)
+(_, r, r_s), d = run_DRSA(dataset, "DOMApriori", 3, 2)
 #print(r_s)
-#print(r['rule type 1/3'])
-#print(r['rule type 2/4'])
+print(r['rule type 1/3'])
+print(r['rule type 2/4'])
 #print(_)
-#print(len(r['rule type 1/3']))
-#print(len(r['rule type 2/4']))
+print(len(r['rule type 1/3']))
+print(len(r['rule type 2/4']))
 
-#print("VC")
-#(_, r, r_s), d = run_VC_DRSA(dataset, "DOMApriori", 0.8, 3, 2)
+print("VC")
+(_, r, r_s), d = run_VC_DRSA(dataset, "DOMApriori", 0.8, 3, 2)
 #print(r_s)
-#print(r['rule type 1/3'])
+print(r['rule type 1/3'])
 #print(_)
-#print(len(r['rule type 1/3']))
-#print("new")
-#print(leave_one_out_new_scheme_classification('data\jose-medical-2017 (2).isf', 'DRSA', 1.0))
-#print("simple")
-#print(leave_one_out_simple_classification('data\jose-medical-2017 (2).isf', 'DRSA', 1.0))
+print(len(r['rule type 1/3']))
+
 
 

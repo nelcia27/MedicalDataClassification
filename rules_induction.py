@@ -444,15 +444,7 @@ def apriori2_gen(strong_sets, k):
             tmp.append(q['w'][-1])
             c_ = {'w': tmp, 'positive_support': 0, 'negative_support': 0}
             ck_.append(c_)
-    #ck_new = []
-    #tu błąd
-    #str_sets = [i['w'] for i in strong_sets]
-    #for k_ in range(k):
-        #s = [i['w'][k_] for i in ck_]
-        #if s in str_sets:
-            #ck_new.append(s)
-    #print(ck_new)
-    return ck_#ck_new
+    return ck_
 
 
 def check_generality(c_, c):
@@ -464,17 +456,25 @@ def check_generality(c_, c):
             for c2 in c_['w']:
                 if c1['criterion'] == c2['criterion']:
                     if c1['preference'] == 'gain':
-                        if c2['condition'] >= c1['condition']:
+                        if c2['condition'] >= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] <= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
                     else:
-                        if c2['condition'] <= c1['condition']:
+                        if c2['condition'] <= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] >= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
         if ok == len(c_['w']):
-            return c#True
+            return c
         else:
-            return None#False
+            return None
     else:
-        return None#False
+        return None
 
 
 def find_covered(c, dataset):
@@ -531,38 +531,7 @@ def apriori_dom_rules(class_approx, dataset, rule_type, class_approx_name, max_l
             if c['negative_support'] <= 0:
                 lk_new.append(c)
         ls[i] = lk_new
-        #tu jest błąd bo za mało usuwam - raczej nie
-        #jeszcze brAKUJE DRUGIEGO TESTU MINIMALNOŚCI - tak ale on chyba az tyle nie da
-        """
-        for n, lk_ in enumerate(ls[1:i+1]):#[1:]
-            lk_new = []
-            for c in lk_:
-                for m,lj in enumerate(reversed(ls[1:n+2])):#???n+1
-                    for c_ in lj:
-                        if not check_generality(c_, c) and c not in lk_new:
-                            lk_new.append(c)
-            ls[n+1] = lk_new
-            """
-    #minimalność per grupa
-    for i, lk_ in enumerate(ls):
-        crit_lk_keys = list(itertools.combinations(set(crits), i+1))
-        crit_lk_lookup = {i: list(k) for i, k in enumerate(crit_lk_keys)}
-        crit_lk = {i:[] for i, k in enumerate(crit_lk_keys)}
-        for l in lk_:
-            key_ = list(i['criterion'] for i in l['w'])
-            to_look_for = list(crit_lk_lookup.values()).index(key_)
-            crit_lk[to_look_for].append(l)
-        lk_delete = []
-        for item in crit_lk.items():
-            if len(item[1]) > 1:
-                for elem1 in item[1]:
-                    for elem2 in item[1]:
-                        d = check_generality(elem1,elem2)
-                        if d is not None:
-                            lk_delete.append(d)
-        ls[i] = [e for e in lk_ if e not in lk_delete]
-    #minimalność dla różnych długości
-    for lk in ls:
+    for i, lk in enumerate(ls):
         lk_delete = []
         for l1 in lk:
             for l2 in lk:
@@ -570,11 +539,15 @@ def apriori_dom_rules(class_approx, dataset, rule_type, class_approx_name, max_l
                     d = check_generality(l1, l2)
                 elif len(l1['w']) > len(l2['w']):
                     d = check_generality(l2, l1)
-                else:
-                    d = None
+                elif len(l1['w']) == len(l2['w']):
+                    d = check_generality(l2, l1)
+                    if d is None:
+                        d = check_generality(l1, l2)
+                    else:
+                        lk_delete.append(d)
                 if d is not None:
                     lk_delete.append(d)
-        ls[i] = [e for e in lk_ if e not in lk_delete]
+        ls[i] = [e for e in lk if e not in lk_delete]
     ls_ = []
     for l in ls:
         if len(l) != 0:
@@ -587,19 +560,27 @@ def apriori_dom_rules(class_approx, dataset, rule_type, class_approx_name, max_l
 
 
 def check_generality_v2(c_, c):
-    c_acc = len(c_[-2])
-    c__acc = len(c[-2])
+    c_acc = len(c[-2])
+    c__acc = len(c_[-2])
     if c_acc < c__acc:
         ok = 0
         for c1 in c[:-2]:
             for c2 in c_[:-2]:
                 if c1['criterion'] == c2['criterion']:
                     if c1['preference'] == 'gain':
-                        if c2['condition'] >= c1['condition']:
+                        if c2['condition'] >= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] <= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
                     else:
-                        if c2['condition'] <= c1['condition']:
+                        if c2['condition'] <= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] >= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
         if ok == len(c_[:-2]):
             return c
         else:
@@ -612,47 +593,82 @@ def minimal_rule_set_DOMA_priori(rules_prev, rules_new):
     rules_to_delete = []
     for r1 in rules_prev:
         for r2 in rules_new:
-            if len(r1) >= len(r2):
+            if len(r1) <= len(r2):
                 d = check_generality_v2(r1, r2)
                 if d is not None:
                     rules_to_delete.append(d)
     return [e for e in rules_new if e not in rules_to_delete]
 
 
+def check_reduce(r2, r1):
+    ok = 0
+    for c1 in r1[:-2]:
+        for c2 in r2[:-2]:
+            if c1['criterion'] == c2['criterion']:
+                if c1['preference'] == 'gain':
+                    if c2['condition'] >= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
+                        ok += 1
+                        break
+                    elif c2['condition'] <= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                        ok += 1
+                        break
+                else:
+                    if c2['condition'] <= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
+                        ok += 1
+                        break
+                    elif c2['condition'] >= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                        ok += 1
+                        break
+    if ok == len(r2[:-2]):
+        return r1
+
+
+def minimal_check(rules):
+    rules_to_delete = []
+    for r1 in rules:
+        for r2 in rules:
+            if r1 != r2:
+                if len(r1[-2]) == len(r2[-2]):
+                    d = check_reduce(r1, r2)
+                    if d is None:
+                        d = check_reduce(r2, r1)
+                    if d is not None:
+                        rules_to_delete.append(d)
+                        d = check_reduce(r2, r1)
+                        if d is not None:
+                            rules_to_delete.append(d)
+    return [e for e in rules if e not in rules_to_delete]
+
+
 def DOMApriori_DRSA(approx, dataset, max_length, min_support):
     rules = {'rule type 1/3': [], 'rule type 2/4': []}
-    rules_tmp = [[], []]
+    rules_tmp = [[], [], [], []]
 
     # RULE TYPE 3
     for a in approx['lower_approx_downward_union']:
-        print(a['union'])
-        #print(a['objects'])
         new_rules = apriori_dom_rules(a['objects'], dataset, 3, a['union'], max_length, min_support)
-        n_r = minimal_rule_set_DOMA_priori(rules_tmp[0], new_rules)
+        n_r = minimal_check(minimal_rule_set_DOMA_priori(rules_tmp[0], new_rules))
         rules_tmp[0] += n_r
 
     # RULE TYPE 1
     for a in reversed(approx['lower_approx_upward_union']):
-        print(a['union'])
-        #print(a['objects'])
         new_rules = apriori_dom_rules(a['objects'], dataset, 1, a['union'], max_length, min_support)
-        n_r = minimal_rule_set_DOMA_priori(rules_tmp[0], new_rules)
-        rules_tmp[0] += n_r
-    rules['rule type 1/3'] = rules_tmp[0]
-
-    # RULE TYPE 2
-    for a in reversed(approx['upper_approx_upward_union']):
-        new_rules = apriori_dom_rules(a['objects'], dataset, 1, a['union'], max_length, min_support)
-        n_r = minimal_rule_set_DOMA_priori(rules_tmp[1], new_rules)
+        n_r = minimal_check(minimal_rule_set_DOMA_priori(rules_tmp[1], new_rules))
         rules_tmp[1] += n_r
-
+    rules['rule type 1/3'] = rules_tmp[0] + rules_tmp[1]
 
     # RULE TYPE 4
     for a in approx['upper_approx_downward_union']:
         new_rules = apriori_dom_rules(a['objects'], dataset, 4, a['union'], max_length, min_support)
-        n_r = minimal_rule_set_DOMA_priori(rules_tmp[1], new_rules)
-        rules_tmp[1] += n_r
-    rules['rule type 2/4'] = rules_tmp[1]
+        n_r = minimal_check(minimal_rule_set_DOMA_priori(rules_tmp[2], new_rules))
+        rules_tmp[2] += n_r
+
+    # RULE TYPE 2
+    for a in reversed(approx['upper_approx_upward_union']):
+        new_rules = apriori_dom_rules(a['objects'], dataset, 1, a['union'], max_length, min_support)
+        n_r = minimal_check(minimal_rule_set_DOMA_priori(rules_tmp[3], new_rules))
+        rules_tmp[3] += n_r
+    rules['rule type 2/4'] = rules_tmp[2] + rules_tmp[3]
 
     criteria = [c['name'] for c in dataset['attributes']]
     rules_readable = {'rule type 1/3': build_rules(rules['rule type 1/3'], criteria),
@@ -663,19 +679,27 @@ def DOMApriori_DRSA(approx, dataset, max_length, min_support):
 
 
 def check_generality_VC(c_, c):
-    c_acc = c['positive_support']/(c['positive_support'] + c['negative_support'])
-    c__acc = c_['positive_support']/(c['positive_support'] + c['negative_support'])
+    c_acc = float(c['positive_support'])/float(c['positive_support'] + c['negative_support'])
+    c__acc = float(c_['positive_support'])/float(c_['positive_support'] + c_['negative_support'])
     if c_acc < c__acc:
         ok = 0
         for c1 in c['w']:
             for c2 in c_['w']:
                 if c1['criterion'] == c2['criterion']:
                     if c1['preference'] == 'gain':
-                        if c2['condition'] >= c1['condition']:
+                        if c2['condition'] >= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] <= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
                     else:
-                        if c2['condition'] <= c1['condition']:
+                        if c2['condition'] <= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] >= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
         if ok == len(c_['w']):
             return c
         else:
@@ -686,15 +710,16 @@ def check_generality_VC(c_, c):
 
 def apriori_dom_rules_VC(class_approx, dataset, rule_type, class_approx_name, max_length, min_support, l):
     criteria = [c['preference'] for c in dataset['attributes']]
-    crits = [i for i in range(len(criteria)-1)]
+    crits = [i for i in range(len(criteria) - 1)]
     if max_length > len(crits):
         max_length = len(crits)
-    l1, c1 = create_conditions(class_approx, crits,  rule_type, criteria[:-1], dataset['objects'], class_approx_name, min_support)
+    l1, c1 = create_conditions(class_approx, crits, rule_type, criteria[:-1], dataset['objects'], class_approx_name,
+                               min_support)
     l_k_1 = l1
     ls = [l1]
     k = 2
     while len(l_k_1) != 0 and k <= max_length:
-        ck = apriori2_gen(l_k_1, k-1)
+        ck = apriori2_gen(l_k_1, k - 1)
         for x in dataset['objects']:
             update_support(ck, x, class_approx)
         lk = [c for c in ck if c['positive_support'] >= min_support]
@@ -705,41 +730,26 @@ def apriori_dom_rules_VC(class_approx, dataset, rule_type, class_approx_name, ma
     for i, lk in enumerate(ls):
         lk_new = []
         for c in lk:
-            if c['positive_support']/(c['positive_support'] + c['negative_support']) >= l:
+            if float(c['positive_support'])/float(c['positive_support'] + c['negative_support']) >= l:
                 lk_new.append(c)
         ls[i] = lk_new
-    #minimalność per grupa
-    for i, lk_ in enumerate(ls):
-        crit_lk_keys = list(itertools.combinations(set(crits), i+1))
-        crit_lk_lookup = {i: list(k) for i, k in enumerate(crit_lk_keys)}
-        crit_lk = {i:[] for i, k in enumerate(crit_lk_keys)}
-        for l in lk_:
-            key_ = list(i['criterion'] for i in l['w'])
-            to_look_for = list(crit_lk_lookup.values()).index(key_)
-            crit_lk[to_look_for].append(l)
-        lk_delete = []
-        for item in crit_lk.items():
-            if len(item[1]) > 1:
-                for elem1 in item[1]:
-                    for elem2 in item[1]:
-                        d = check_generality(elem1, elem2)
-                        if d is not None:
-                            lk_delete.append(d)
-        ls[i] = [e for e in lk_ if e not in lk_delete]
-    #minimalność dla różnych długości
-    for lk in ls:
+    for i, lk in enumerate(ls):
         lk_delete = []
         for l1 in lk:
             for l2 in lk:
                 if len(l1['w']) < len(l2['w']):
-                    d = check_generality(l1, l2)
+                    d = check_generality_VC(l1, l2)
                 elif len(l1['w']) > len(l2['w']):
-                    d = check_generality(l2, l1)
-                else:
-                    d = None
+                    d = check_generality_VC(l2, l1)
+                elif len(l1['w']) == len(l2['w']):
+                    d = check_generality_VC(l2, l1)
+                    if d is None:
+                        d = check_generality_VC(l1, l2)
+                    else:
+                        lk_delete.append(d)
                 if d is not None:
                     lk_delete.append(d)
-        ls[i] = [e for e in lk_ if e not in lk_delete]
+        ls[i] = [e for e in lk if e not in lk_delete]
     ls_ = []
     for l in ls:
         if len(l) != 0:
@@ -751,20 +761,30 @@ def apriori_dom_rules_VC(class_approx, dataset, rule_type, class_approx_name, ma
     return r
 
 
-def check_generality_VC_v2(rules_prev, rules_new):
-    c_acc = len(c_[-2])#???
-    c__acc = len(c[-2])#???
+def check_generality_VC_v2(c_, c, approx):
+    c1_p = len([e for e in c[-2] if e in approx])
+    c2_p = len([e for e in c_[-2] if e in approx])
+    c_acc = float(c1_p)/float(len(c[-2]))
+    c__acc = float(c2_p)/float(len(c_[-2]))
     if c_acc < c__acc:
         ok = 0
         for c1 in c[:-2]:
             for c2 in c_[:-2]:
                 if c1['criterion'] == c2['criterion']:
                     if c1['preference'] == 'gain':
-                        if c2['condition'] >= c1['condition']:
+                        if c2['condition'] >= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] <= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
                     else:
-                        if c2['condition'] <= c1['condition']:
+                        if c2['condition'] <= c1['condition'] and (c1['rule_type'] == 3 or c1['rule_type'] == 4):
                             ok += 1
+                            break
+                        elif c2['condition'] >= c1['condition'] and (c1['rule_type'] == 1 or c1['rule_type'] == 2):
+                            ok += 1
+                            break
         if ok == len(c_[:-2]):
             return c
         else:
@@ -773,33 +793,54 @@ def check_generality_VC_v2(rules_prev, rules_new):
         return None
 
 
-def minimal_rule_set_DOMA_priori_VC(rules_prev, rules_new):
+def minimal_rule_set_DOMA_priori_VC(rules_prev, rules_new, approx):
     rules_to_delete = []
     for r1 in rules_prev:
         for r2 in rules_new:
-            if len(r1['w']) >= len(r2['w']):
-                d = check_generality_VC_v2(r1, r2)
+            if len(r1) <= len(r2):
+                d = check_generality_VC_v2(r1, r2, approx)
                 if d is not None:
                     rules_to_delete.append(d)
     return [e for e in rules_new if e not in rules_to_delete]
 
 
+def minimal_check_VC(rules, approx):
+    rules_to_delete = []
+    for r1 in rules:
+        for r2 in rules:
+            if r1 != r2:
+                c1_p = len([e for e in r1[-2] if e in approx])
+                c2_p = len([e for e in r2[-2] if e in approx])
+                c_acc = float(c1_p) / float(len(r1[-2]))
+                c__acc = float(c2_p) / float(len(r2[-2]))
+                if c_acc == c__acc:
+                    d = check_reduce(r1, r2)
+                    if d is None:
+                        d = check_reduce(r2, r1)
+                    if d is not None:
+                        rules_to_delete.append(d)
+                        d = check_reduce(r2, r1)
+                        if d is not None:
+                            rules_to_delete.append(d)
+    return [e for e in rules if e not in rules_to_delete]
+
+
 def DOMApriori_VC_DRSA(approx, dataset, l, max_length, min_support):
     rules = {'rule type 1/3': []}
-    rules_tmp = []
+    rules_tmp = [[], []]
 
     # RULE TYPE 3
     for a in approx['lower_approx_downward_union']:
         new_rules = apriori_dom_rules_VC(a['objects'], dataset, 3, a['union'], max_length, min_support, l)
-        n_r = minimal_rule_set_DOMA_priori(rules_tmp, new_rules)
-        rules_tmp += n_r
+        n_r = minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[0], new_rules, a['objects']), a['objects'])
+        rules_tmp[0] += n_r
 
     # RULE TYPE 1
     for a in reversed(approx['lower_approx_upward_union']):
         new_rules = apriori_dom_rules_VC(a['objects'], dataset, 1, a['union'], max_length, min_support, l)
-        n_r = minimal_rule_set_DOMA_priori(rules_tmp, new_rules)
-        rules_tmp += n_r
-    rules['rule type 1/3'] = rules_tmp
+        n_r = minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[1], new_rules, a['objects']), a['objects'])
+        rules_tmp[1] += n_r
+    rules['rule type 1/3'] = rules_tmp[0] + rules_tmp[1]
 
     criteria = [c['name'] for c in dataset['attributes']]
     rules_readable = {'rule type 1/3': build_rules(rules['rule type 1/3'], criteria)}
