@@ -37,6 +37,7 @@ def run_DRSA(dataset, algorithm, max_length, min_support):
     elif algorithm == 'DOMApriori':
         return DOMApriori_DRSA(approx_DRSA, dataset, max_length, min_support), data
 
+
 def run_VC_DRSA(dataset, algorithm, l, max_length, min_support):
     downward_union = find_downward_union_of_classes(dataset)
     upward_union = find_upward_union_of_classes(dataset)
@@ -416,11 +417,11 @@ def run_experiment_full(max_length, min_support):
         print("Done")
 
 
-run_experiment_full(10, 2)
+run_experiment_full(3, 1)
 
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
 
-#a, p, o = read_dataset('data\exampleStef.isf')
+#a, p, o = read_dataset('data\jose-medical-2017 (2).isf')
 #dataset = prepare_dataset(a, p, o)
 #(_, r, r_s), d = run_DRSA(dataset, "DOMApriori", 3, 2)
 #print(r_s)

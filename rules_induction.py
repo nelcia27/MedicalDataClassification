@@ -387,44 +387,11 @@ def build_candidates(strong_sets):
     for s in strong_sets:
         if s['negative_support'] > 0:
             interesting.append(s)
-    interesting_dict = {}
-    for i in range(len(interesting)):
-        interesting_dict[i] = interesting[i]
-    crit_pairs = []
-    for i in interesting:
-        k = [k['criterion'] for k in i['w']]
-        if k not in crit_pairs:
-            crit_pairs.append(k)
-    crit_pairs_dict = {}
-    for i in range(len(crit_pairs)):
-        crit_pairs_dict[i] = crit_pairs[i]
-    possible_crit_pairs = []
-    for p in crit_pairs:
-        for q in crit_pairs:
-            if p != q and p[:-1] == q[:-1]:
-                if p + q == sorted(p + q) and p + q not in possible_crit_pairs:
-                    possible_crit_pairs.append([p,q])
-    groups = {}
-    for ind, i in enumerate(crit_pairs):
-        for elem in interesting_dict.items():
-            k = [k['criterion'] for k in elem[1]['w']]
-            if k == i:
-                if ind in list(groups.keys()):
-                    groups[ind].append([interesting_dict[elem[0]]])
-                else:
-                    groups[ind] = [[interesting_dict[elem[0]]]]
     candidates = []
-    for c in possible_crit_pairs:
-        p = c[0]
-        q = c[1]
-        for i in crit_pairs_dict.items():
-            if i[1] == p:
-                cand1 = groups[i[0]]
-            elif i[1] == q:
-                cand2 = groups[i[0]]
-        for c1 in cand1:
-            for c2 in cand2:
-                candidates.append((c1, c2))
+    for i in interesting:
+        for j in interesting:
+            if i != j:
+                candidates.append([i, j])
     return candidates
 
 
@@ -433,18 +400,28 @@ def apriori2_gen(strong_sets, k):
     cand = build_candidates(strong_sets)
     l = k-1
     for c in cand:
-        p = c[0][0]
-        q = c[1][0]
+        p = c[0]
+        q = c[1]
         ok1 = True
-        for i in range(k-1):
+        for i in range(l):
             if p['w'][i]['criterion'] != q['w'][i]['criterion'] or p['w'][i]['condition'] != q['w'][i]['condition']:
                 ok1 = False
-        if ok1 and p['w'][l]['criterion'] != q['w'][l]['criterion'] and p['w'][l]['condition'] < q['w'][l]['condition']:
+        if ok1 and p['w'][l]['criterion'] < q['w'][l]['criterion']:
             tmp = p['w'].copy()
             tmp.append(q['w'][-1])
             c_ = {'w': tmp, 'positive_support': 0, 'negative_support': 0}
             ck_.append(c_)
-    return ck_
+    ck_new = []
+    s_sets = [c['w'] for c in strong_sets]
+    for c in ck_:
+        ind = list(itertools.combinations(c['w'], k))
+        ok = True
+        for p in ind:
+            if list(p) not in s_sets:
+                ok = False
+        if ok:
+            ck_new.append(c)
+    return ck_new
 
 
 def check_generality(c_, c):
