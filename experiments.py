@@ -348,6 +348,44 @@ def prepare_report(data, name, num_class, num_attributes):
         df10.to_excel(writer, sheet_name='Walidacja krzyżowa szczegóły', index=False)
 
 
+def prepare_report_latex(data):
+    with pd.option_context("max_colwidth", 1000):
+        dw_un = [(list(d.keys())[0]) for d in data['unie'][0]]
+        dw_un_ = [d[list(d.keys())[0]][1] for d in data['unie'][0]]
+        up_un = [(list(d.keys())[0]) for d in data['unie'][1]]
+        up_un_ = [d[list(d.keys())[0]][1] for d in data['unie'][1]]
+        df3 = pd.DataFrame({"Unie": dw_un, "Obiekty": dw_un_})
+        print("unie w dół")
+        print(df3.to_latex( index=False))
+        df4 = pd.DataFrame({"Unie": up_un, "Obiekty": up_un_})
+        print("unie w górę")
+        print(df4.to_latex(index=False))
+        df5 = pd.DataFrame(data['dominacja'][0])
+        df5 = df5.drop('objects', 1)
+        print("domunujące")
+        print(df5.to_latex(index=False))
+        print("zdominowane")
+        df6 = pd.DataFrame(data['dominacja'][1])
+        df6 = df6.drop('objects', 1)
+        print(df6.to_latex(index=False))
+        k = list(data['przybliżenia'].keys())
+        print("przybliżenia unii")
+        for i, k_ in enumerate(k):
+            print(k)
+            df_ = pd.DataFrame(data['przybliżenia'][k_])
+            print(df_.to_latex(index=False))
+        print("statystyki przybliżeń")
+        df7 = pd.DataFrame(data['statystyki_przybliżeń'])
+        print(df7.to_latex(index=False))
+        print("reguły")
+        r = ['Reguła ' + str(i+1) for i in range(len(data['reguły']['rule type 1/3']))]
+        df8 = pd.DataFrame({'Oznaczenie reguły': r, 'Reguła': data['reguły']['rule type 1/3']})
+        print(df8.to_latex(index=False))
+        print("statystyki reguł")
+        df9 = pd.DataFrame(data['statystyki_reguł']).transpose()
+        print(df9.to_latex(index=False))
+
+
 def run_experiment_single(dataset_name, type, induction_algorithm, classification_algorithm, name, max_length, min_support):
     a, p, o = read_dataset(dataset_name)
     dataset = prepare_dataset(a, p, o)
@@ -394,6 +432,37 @@ def run_experiment_single(dataset_name, type, induction_algorithm, classificatio
     prepare_report(data, name, len(find_all_possible_decision_classes(dataset))+1, len(data['zbiór']['attributes']))
 
 
+def run_experiment_single_latex(dataset_name, type, induction_algorithm, classification_algorithm, max_length, min_support, l, to_test):
+    a, p, o = read_dataset(dataset_name)
+    dataset = prepare_dataset(a, p, o)
+    folds = [{'train': {"attributes": dataset['attributes'], "objects": [o1 for o1 in dataset['objects'] if o1 != o]},
+              'test': o} for o in dataset['objects']]
+    dataset = folds[to_test]["train"]
+    classes = find_all_possible_decision_classes(dataset)
+    test = folds[to_test]["test"]
+    if type == 'DRSA':
+        downward_union = find_downward_union_of_classes(dataset)
+        upward_union = find_upward_union_of_classes(dataset)
+        (r, r_r, r_s), d = run_DRSA(dataset, induction_algorithm, max_length, min_support)
+        classify_new_scheme(test, r['rule type 1/3'], classes, dataset, downward_union, upward_union)
+    elif type == 'VC-DRSA':
+        downward_union = find_downward_union_of_classes(dataset)
+        upward_union = find_upward_union_of_classes(dataset)
+        (r, r_r, r_s), d = run_VC_DRSA(dataset, induction_algorithm, l, max_length, min_support)
+        classify_new_scheme(test, r['rule type 1/3'], classes, dataset, downward_union, upward_union)
+    data = {
+        'zbiór': dataset,
+        'uruchomienie': {'wersja algorytmu': type, 'algorytm indukcji reguł': induction_algorithm, 'algorytm klasyfikacji': classification_algorithm, 'poziom spójności': l},
+        'unie': d['unie'],
+        'dominacja': d['dominacja'],
+        'przybliżenia': d['approx'],
+        'statystyki_przybliżeń': d['stats'],
+        'reguły': r_r,
+        'statystyki_reguł': calculate_rules_stats(r_s['rule type 1/3'], d['approx'], len(dataset['objects'])),
+    }
+    #prepare_report_latex(data)
+
+
 def run_experiment_full(max_length, min_support):
     files = ['data\jose-medical-2017 (2).isf', 'data\jose-medical (1).isf']
     for i, file in enumerate(files):
@@ -417,8 +486,31 @@ def run_experiment_full(max_length, min_support):
         print("Done")
 
 
-run_experiment_full(3, 1)
+def run_experiment_full_latex(max_length, min_support, l, to_test):
+    files = ['data\jose-medical (1).isf']#'data\jose-medical-2017 (2).isf',
+    for i, file in enumerate(files):
+        print("Working on file: " + file)
+        print('DRSA, DOMLEM, OLD')
+        run_experiment_single_latex(file, 'VC-DRSA', 'DOMApriori', 'new', max_length, min_support, l, to_test)
+        print('DRSA, DOMApriori, OLD')
+        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'old', 'DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
+        print('DRSA, DOMLEM, NEW')
+        #run_experiment_single(file, 'DRSA', 'DOMLEM', 'new', 'DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
+        print('DRSA, DOMApriori, NEW')
+        #run_experiment_single(file, 'DRSA', 'DOMApriori', 'new', 'DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
+        print('VC-DRSA, DOMLEM, OLD')
+        #run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'old', 'VC_DRSA_DOMLEM_OLD'+str(i), max_length, min_support)
+        print('VC-DRSA, DOMApriori, OLD')
+        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'old', 'VC_DRSA_DOMApriori_OLD'+str(i), max_length, min_support)
+        print('VC-DRSA, DOMLEM, NEW')
+        #run_experiment_single(file, 'VC-DRSA', 'DOMLEM', 'new', 'VC_DRSA_DOMLEM_NEW'+str(i), max_length, min_support)
+        print('VC-DRSA, DOMApriori, NEW')
+        #run_experiment_single(file, 'VC-DRSA', 'DOMApriori', 'new', 'VC_DRSA_DOMApriori_NEW'+str(i), max_length, min_support)
+        print("Done")
 
+
+#run_experiment_full(3, 1)
+run_experiment_full_latex(3, 1, 0.8, 2)
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
 
 #a, p, o = read_dataset('data\jose-medical-2017 (2).isf')

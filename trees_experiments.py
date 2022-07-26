@@ -11,14 +11,14 @@ from PIL import Image
 from MedicalDataClassification.DRSA import find_all_possible_decision_classes
 
 
-def build_tree(X, y, criterion, max_depth, class_weight, ccp_alpha):
-    clf = tree.DecisionTreeClassifier(criterion=criterion, max_depth=max_depth, class_weight=class_weight, ccp_alpha=ccp_alpha)
+def build_tree(X, y, criterion):#, max_depth, class_weight, ccp_alpha
+    clf = tree.DecisionTreeClassifier(criterion=criterion)#
     clf = clf.fit(X, y)
     return clf
 
 
-def build_random_forest(X, y, n_estimators, criterion, max_depth, bootstrap, class_weight, ccp_alpha):
-    clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth, bootstrap=bootstrap, class_weight=class_weight, ccp_alpha=ccp_alpha)
+def build_random_forest(X, y, n_estimators, criterion):#, max_depth, bootstrap, class_weight, ccp_alpha
+    clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion)#, max_depth=max_depth, bootstrap=bootstrap, class_weight=class_weight, ccp_alpha=ccp_alpha
     clf = clf.fit(X, y)
     return clf
 
@@ -44,6 +44,29 @@ def find_best_forest(X, y):
     clf = GridSearchCV(rf, parameters, cv=lo, scoring=['accuracy', 'f1_weighted'], refit='accuracy')
     clf.fit(X, y)
     return clf.best_estimator_, clf.best_params_, clf.best_score_, clf.cv_results_
+
+
+def prepare_report_latex(dataset, data, is_tree, name, class_):
+    attributes = [o['name'] for o in dataset['attributes']]
+    clf = data
+    if is_tree:
+        plt.figure(figsize=(18, 18))
+        tree.plot_tree(clf, fontsize=10, feature_names=attributes[:-1], class_names=class_, filled=True, impurity=True, rounded=True)
+        plt.savefig('results\dec_trees_mgr\ImageTree'+name+'.jpg', bbox_inches='tight')
+    else:
+        n_estimators = len(clf.estimators_)
+        images = []
+        for i in range(n_estimators):
+            plt.figure(figsize=(18, 24))
+            tree.plot_tree(clf.estimators_[i], feature_names=attributes[:-1], class_names=class_, filled=True, impurity=True, rounded=True, fontsize=10)
+            plt.savefig('results\dec_trees_mgr\ImageRF' + name + '_estimator_' + str(i) + '.jpg', bbox_inches='tight')
+            images.append('results\dec_trees_mgr\ImageRF' + name + '_estimator_' + str(i) + '.jpg')
+        imgs = [Image.open(i) for i in images]
+        min_shape = sorted([(np.sum(i.size), i.size) for i in imgs])[0][1]
+        imgs_comb = np.vstack([np.asarray(i.resize(min_shape)) for i in imgs])
+        imgs_comb = Image.fromarray(imgs_comb)
+        imgs_comb.save('results\dec_trees_mgr\ImageRF' + name + '_combined.jpg')
+    return 0
 
 
 def prepare_report(dataset, data, is_tree, name, X, y, class_):
@@ -94,14 +117,14 @@ def prepare_report(dataset, data, is_tree, name, X, y, class_):
         df6.to_excel(writer, sheet_name='Walidacja krzyżowa - f1', index=False)
     clf = data[0]
     if is_tree:
-        plt.figure(figsize=(12, 12))
+        plt.figure(figsize=(18, 24))
         tree.plot_tree(clf, fontsize=10, feature_names=attributes[:-1], class_names=class_, filled=True, impurity=True, rounded=True)
         plt.savefig('results\dec_trees\ImageTree'+name+'.jpg', bbox_inches='tight')
     else:
         n_estimators = len(clf.estimators_)
         images = []
         for i in range(n_estimators):
-            plt.figure(figsize=(12, 12))
+            plt.figure(figsize=(18, 24))
             tree.plot_tree(clf.estimators_[i], feature_names=attributes[:-1], class_names=class_, filled=True, impurity=True, rounded=True, fontsize=10)
             plt.savefig('results\dec_trees\ImageRF' + name + '_estimator_' + str(i) + '.jpg', bbox_inches='tight')
             images.append('results\dec_trees\ImageRF' + name + '_estimator_' + str(i) + '.jpg')
@@ -127,17 +150,46 @@ def run_experiment_single(dataset_name, type, name):
         prepare_report(dataset, find_best_forest(X, y), False, name, X, y, class_)
 
 
+def run_experiment_single_latex(dataset_name, type, name, to_test):
+    a, p, o = read_dataset(dataset_name)
+    dataset = prepare_dataset(a, p, o)
+    folds = [{'train': {"attributes": dataset['attributes'], "objects": [o1 for o1 in dataset['objects'] if o1 != o]},
+              'test': o} for o in dataset['objects']]
+    dataset = folds[to_test]["train"]
+    ds = dataset_to_trees(dataset)
+    cols = list(ds.columns)
+    X = ds[cols[:-1]]
+    y = ds[cols[-1]].values
+    class_ = [str(i) for i in find_all_possible_decision_classes(dataset)]
+    if type == 'tree':
+        prepare_report_latex(dataset, build_tree(X, y, 'gini'), True, name, class_)
+    elif type == 'rf':
+        prepare_report_latex(dataset, build_random_forest(X, y, 3, 'gini'), False, name, class_)
+
+
 def run_experiment_full():
-    files = ['data\jose-medical-2017 (2).isf']#, 'data\jose-medical (1).isf']
+    files = ['data\jose-medical-2017 (2).isf', 'data\jose-medical (1).isf']
     for i, file in enumerate(files):
         print("Working on file: " + file)
         print('Tree')
         run_experiment_single(file, 'tree', 'tree' + str(i))
         print('Random Forest')
-        #run_experiment_single(file, 'rf', 'random_forest'+str(i))
+        run_experiment_single(file, 'rf', 'random_forest'+str(i))
         print("Done")
 
 
+def run_experiment_full_latex(to_test):
+    files = ['data\jose-medical (1).isf']#'data\jose-medical-2017 (2).isf']
+    for i, file in enumerate(files):
+        print("Working on file: " + file)
+        print('Tree')
+        run_experiment_single_latex(file, 'tree', 'tree' + str(i), to_test)
+        print('Random Forest')
+        run_experiment_single_latex(file, 'rf', 'random_forest'+str(i), to_test)
+        print("Done")
+
+
+#run_experiment_full_latex(2)
 run_experiment_full()
 #'jose-medical-2017 (2).isf')jose-medical (1).isf
 #print(find_best_forest(X, y))

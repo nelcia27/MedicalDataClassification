@@ -200,7 +200,11 @@ def classify_new_scheme(object, rules, classes, dataset, downward_unions, upward
         max_score = 0
         best_class = []
         for c in classes:
+            print(c)
+            print("score+",calculate_score_plus(dataset, c, rules_matched, classes))
+            print("score-",calculate_score_minus(dataset, c, rules_matched, classes, downward_unions, upward_unions))
             score = calculate_score_plus(dataset, c, rules_matched, classes) - calculate_score_minus(dataset, c, rules_matched, classes, downward_unions, upward_unions)
+            print("score", score)
             if score > max_score or len(best_class) == 0:
                 max_score = score
                 best_class = []
@@ -211,6 +215,7 @@ def classify_new_scheme(object, rules, classes, dataset, downward_unions, upward
             assigned_class.append(None)
         else:
             assigned_class.append(best_class[0])
+    print("assigned class", assigned_class)
     return assigned_class
 
 
