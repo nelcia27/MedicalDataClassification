@@ -824,14 +824,12 @@ def DOMApriori_VC_DRSA(approx, dataset, l, max_length, min_support):
 
     # RULE TYPE 3
     for a in approx['lower_approx_downward_union']:
-        print(a['union'])
         new_rules = apriori_dom_rules_VC(a['objects'], dataset, 3, a['union'], max_length, min_support, l)
         n_r = delete_doubled(rules_tmp[0], minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[0], new_rules, a['objects']), a['objects']))
         rules_tmp[0] += n_r
 
     # RULE TYPE 1
     for a in reversed(approx['lower_approx_upward_union']):
-        print(a['union'])
         new_rules = apriori_dom_rules_VC(a['objects'], dataset, 1, a['union'], max_length, min_support, l)
         n_r = delete_doubled(rules_tmp[1], minimal_check_VC(minimal_rule_set_DOMA_priori_VC(rules_tmp[1], new_rules, a['objects']), a['objects']))
         rules_tmp[1] += n_r

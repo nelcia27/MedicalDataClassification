@@ -170,6 +170,22 @@ def leave_one_out_new_scheme_classification(dataset_name, type, algorithm, l, ma
     return accuracy, not_classified, correct, f1_score(expected_result, y_pred, labels=labels, average='weighted')
 
 
+def leave_one_out_importance(dataset_name, type, algorithm, l, max_length, min_support):
+    a, p, o = read_dataset(dataset_name)
+    dataset = prepare_dataset(a, p, o)
+    folds = [{'train': {"attributes": dataset['attributes'], "objects": [o1 for o1 in dataset['objects'] if o1 != o]}, 'test': o} for o in dataset['objects']]
+    result = []
+    if type == "VC-DRSA":
+        for f in folds:
+            (r, r_r, r_s), _ = run_VC_DRSA(f['train'], algorithm, l, max_length, min_support)
+            result.append(r['rule type 1/3'])
+    else:
+        for f in folds:
+            (r, r_r, r_s), _ = run_DRSA(f['train'], algorithm, max_length, min_support)
+            result.append(r['rule type 1/3'])
+    return result
+
+
 def find_best_model(dataset_name, range_, new_scheme, algorithm, max_length, min_support):
     best = []
     best_scores = (0.0, 0.0, 0.0, 0.0)
@@ -463,6 +479,31 @@ def run_experiment_single_latex(dataset_name, type, induction_algorithm, classif
     #prepare_report_latex(data)
 
 
+def calculate_importance(rules):
+    counters = [0, 0, 0, 0, 0, 0, 0]
+    for group in rules:
+        for g in group:
+            if g is not None:
+                if len(g) > 3:
+                    for r_p in g[:-2]:
+                        counters[int(r_p['criterion'])] += 1
+                else:
+
+                    counters[int(g[0]['criterion'])] += 1
+    all = sum(counters)
+    return [c/all for c in counters]
+
+
+def run_experiment_single_importance(dataset_name, type, induction_algorithm, max_length, min_support):
+    if type == 'DRSA':
+        l = 1.0
+        rules = leave_one_out_importance(dataset_name, type, induction_algorithm, 1.0, max_length, min_support)
+    elif type == 'VC-DRSA':
+        l = 0.45
+        rules = leave_one_out_importance(dataset_name, type, induction_algorithm, l, max_length, min_support)
+    return print(calculate_importance(rules))
+
+
 def run_experiment_full(max_length, min_support):
     files = ['data\jose-medical-2017 (2).isf', 'data\jose-medical (1).isf']
     for i, file in enumerate(files):
@@ -509,8 +550,24 @@ def run_experiment_full_latex(max_length, min_support, l, to_test):
         print("Done")
 
 
+def run_experiment_full_importance(max_length, min_support):
+    files = ['data\jose-medical (1).isf']#'data\jose-medical-2017 (2).isf']#,
+    for i, file in enumerate(files):
+        print("Working on file: " + file)
+        print('DRSA, DOMLEM, OLD')
+        #run_experiment_single_importance(file, 'DRSA', 'DOMLEM', max_length, min_support)
+        print('DRSA, DOMApriori, OLD')
+        #run_experiment_single_importance(file, 'DRSA', 'DOMApriori', max_length, min_support)
+        print('VC-DRSA, DOMLEM, OLD')
+        run_experiment_single_importance(file, 'VC-DRSA', 'DOMLEM', max_length, min_support)
+        print('VC-DRSA, DOMApriori, OLD')
+        #run_experiment_single_importance(file, 'VC-DRSA', 'DOMApriori', max_length, min_support)
+        print("Done")
+
+
+run_experiment_full_importance(3, 1)
 #run_experiment_full(3, 1)
-run_experiment_full_latex(3, 1, 0.8, 2)
+#run_experiment_full_latex(3, 1, 0.8, 2)
 # run_DRSA('data\exampleStef.isf')#'')#'jose-medical-2017 (2).isf')jose-medical (1).isf
 
 #a, p, o = read_dataset('data\jose-medical-2017 (2).isf')

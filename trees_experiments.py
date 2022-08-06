@@ -11,16 +11,16 @@ from PIL import Image
 from MedicalDataClassification.DRSA import find_all_possible_decision_classes
 
 
-def build_tree(X, y, criterion):#, max_depth, class_weight, ccp_alpha
-    clf = tree.DecisionTreeClassifier(criterion=criterion)#
+def build_tree(X, y, criterion, max_depth, class_weight, ccp_alpha):#, max_depth, class_weight, ccp_alpha
+    clf = tree.DecisionTreeClassifier(criterion=criterion, max_depth=max_depth, class_weight=class_weight, ccp_alpha=ccp_alpha)#
     clf = clf.fit(X, y)
-    return clf
+    return clf.feature_importances_
 
 
-def build_random_forest(X, y, n_estimators, criterion):#, max_depth, bootstrap, class_weight, ccp_alpha
-    clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion)#, max_depth=max_depth, bootstrap=bootstrap, class_weight=class_weight, ccp_alpha=ccp_alpha
+def build_random_forest(X, y, n_estimators, criterion, max_depth, bootstrap, class_weight, ccp_alpha):#, max_depth, bootstrap, class_weight, ccp_alpha
+    clf = RandomForestClassifier(n_estimators=n_estimators, criterion=criterion, max_depth=max_depth, bootstrap=bootstrap, class_weight=class_weight, ccp_alpha=ccp_alpha)#, max_depth=max_depth, bootstrap=bootstrap, class_weight=class_weight, ccp_alpha=ccp_alpha
     clf = clf.fit(X, y)
-    return clf
+    return clf.feature_importances_
 
 
 def find_best_tree(X, y):
@@ -167,6 +167,75 @@ def run_experiment_single_latex(dataset_name, type, name, to_test):
         prepare_report_latex(dataset, build_random_forest(X, y, 3, 'gini'), False, name, class_)
 
 
+def tree_importance(dataset, criterion, max_depth, class_weight):
+    folds = [{'train': {"attributes": dataset['attributes'], "objects": [o1 for o1 in dataset['objects'] if o1 != o]},
+              'test': o} for o in dataset['objects']]
+    res = np.zeros((7,), dtype=float)
+    for f in folds:
+        ds = dataset_to_trees(f['train'])
+        cols = list(ds.columns)
+        X = ds[cols[:-1]]
+        y = ds[cols[-1]].values
+        class_ = [str(i) for i in find_all_possible_decision_classes(dataset)]
+        res = np.add(build_tree(X, y, criterion, max_depth=max_depth, class_weight=class_weight, ccp_alpha=0.0), res)
+    return res/len(folds)
+
+
+def forest_importance(dataset, n_estimators, criterion, max_depth, bootstrap, class_weight):
+    folds = [{'train': {"attributes": dataset['attributes'], "objects": [o1 for o1 in dataset['objects'] if o1 != o]},
+              'test': o} for o in dataset['objects']]
+    res = np.zeros((7,), dtype=float)
+    for f in folds:
+        ds = dataset_to_trees(f['train'])
+        cols = list(ds.columns)
+        X = ds[cols[:-1]]
+        y = ds[cols[-1]].values
+        res = np.add(build_random_forest(X, y, n_estimators, criterion, max_depth, bootstrap, class_weight, 0.0), res)
+    return res/len(folds)
+
+
+def run_experiment_single_importance(dataset_name, type, name):
+    a, p, o = read_dataset(dataset_name)
+    dataset = prepare_dataset(a, p, o)
+    if type == 'tree':
+        print("tree")
+        print("gini, niestosowana")
+        print(tree_importance(dataset, 'gini', None, None))
+        print("entropy, niestosowana")
+        print(tree_importance(dataset, 'entropy', None, None))
+        print('gini, stosowana')
+        print(tree_importance(dataset, 'gini', None, 'balanced'))
+        print('entropy, stosowana')
+        print(tree_importance(dataset, 'entropy', None, 'balanced'))
+    elif type == 'rf':
+        print("rf")
+        print("gini, niestosowana, 2")
+        print(forest_importance(dataset, 2, 'gini', None, False, None))
+        print("entropy, niestosowana, 2")
+        print(forest_importance(dataset, 2, 'entropy', None, False, None))
+        print('gini, stosowana, 2')
+        print(forest_importance(dataset, 2, 'gini', None, False, 'balanced'))
+        print('entropy, stosowana, 2')
+        print(forest_importance(dataset, 2, 'entropy', None, False, 'balanced'))
+        print('gini, subbalanced, 2')
+        print(forest_importance(dataset, 2, 'gini', None, False, 'balanced_subsample'))
+        print('entropy, subbalanced, 2')
+        print(forest_importance(dataset, 2, 'entropy', None, False, 'balanced_subsample'))
+
+        print("gini, niestosowana, 3")
+        print(forest_importance(dataset, 3, 'gini', None, False, None))
+        print("entropy, niestosowana, 3")
+        print(forest_importance(dataset, 3, 'entropy', None, False, None))
+        print('gini, stosowana, 3')
+        print(forest_importance(dataset, 3, 'gini', None, False, 'balanced'))
+        print('entropy, stosowana, 3')
+        print(forest_importance(dataset, 3, 'entropy', None, False, 'balanced'))
+        print('gini, subbalanced, 3')
+        print(forest_importance(dataset, 3, 'gini', None, False, 'balanced_subsample'))
+        print('entropy, subbalanced, 3')
+        print(forest_importance(dataset, 3, 'entropy', None, False, 'balanced_subsample'))
+
+
 def run_experiment_full():
     files = ['data\jose-medical-2017 (2).isf', 'data\jose-medical (1).isf']
     for i, file in enumerate(files):
@@ -189,8 +258,18 @@ def run_experiment_full_latex(to_test):
         print("Done")
 
 
+def run_experiment_full_importance():
+    files = ['data\jose-medical-2017 (2).isf', 'data\jose-medical (1).isf']
+    for i, file in enumerate(files):
+        print("Working on file: " + file)
+        print('Tree')
+        run_experiment_single_importance(file, 'tree', 'tree' + str(i))
+        print('Random Forest')
+        run_experiment_single_importance(file, 'rf', 'random_forest'+str(i))
+        print("Done")
 #run_experiment_full_latex(2)
-run_experiment_full()
+#run_experiment_full()
+run_experiment_full_importance()
 #'jose-medical-2017 (2).isf')jose-medical (1).isf
 #print(find_best_forest(X, y))
 #print(find_best_tree(X, y))
