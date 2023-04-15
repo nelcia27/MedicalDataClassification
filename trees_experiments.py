@@ -142,12 +142,13 @@ def run_experiment_single(dataset_name, type, name):
     ds = dataset_to_trees(dataset)
     cols = list(ds.columns)
     X = ds[cols[:-1]]
+    print(X)
     y = ds[cols[-1]].values
     class_ = [str(i) for i in find_all_possible_decision_classes(dataset)]
-    if type == 'tree':
-        prepare_report(dataset, find_best_tree(X, y), True, name, X, y, class_)
-    elif type == 'rf':
-        prepare_report(dataset, find_best_forest(X, y), False, name, X, y, class_)
+    #if type == 'tree':
+        #prepare_report(dataset, find_best_tree(X, y), True, name, X, y, class_)
+    #elif type == 'rf':
+        #prepare_report(dataset, find_best_forest(X, y), False, name, X, y, class_)
 
 
 def run_experiment_single_latex(dataset_name, type, name, to_test):
@@ -268,8 +269,8 @@ def run_experiment_full_importance():
         run_experiment_single_importance(file, 'rf', 'random_forest'+str(i))
         print("Done")
 #run_experiment_full_latex(2)
-#run_experiment_full()
-run_experiment_full_importance()
+run_experiment_full()
+#run_experiment_full_importance()
 #'jose-medical-2017 (2).isf')jose-medical (1).isf
 #print(find_best_forest(X, y))
 #print(find_best_tree(X, y))
